@@ -3,10 +3,12 @@ import { BottomNav, SideNav, type NavItem } from "@/components/nav";
 import { OrgSwitcher } from "@/components/org-switcher";
 import { brandStyle } from "@/lib/brand";
 import { getMemberships, isAdmin, isManager, logoUrl, requireMembership } from "@/lib/org";
+import { getHostTenant } from "@/lib/tenant";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const { role, organisation: org } = await requireMembership();
   const memberships = await getMemberships();
+  const onOwnDomain = !!(await getHostTenant());
   const logo = logoUrl(org);
 
   const items: NavItem[] = [{ href: "/dashboard", label: "Home", icon: "home" }];
@@ -25,7 +27,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <span className="truncate font-semibold">{org.name}</span>
           </Link>
           <div className="ml-auto flex items-center gap-2">
-            <OrgSwitcher current={org.id} options={memberships.map((m) => ({ id: m.organisation.id, name: m.organisation.name }))} />
+            {!onOwnDomain && <OrgSwitcher current={org.id} options={memberships.map((m) => ({ id: m.organisation.id, name: m.organisation.name }))} />}
             <form action="/auth/signout" method="post">
               <button className="btn-ghost px-3 py-1.5">Sign out</button>
             </form>

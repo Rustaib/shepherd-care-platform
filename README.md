@@ -18,7 +18,7 @@ installable PWA for iPhone and Android.
 | 3. Rostering | Calendar, shifts, appointments, open shifts | |
 | 4. Staff mobile flow | My shifts, clock in/out, progress & incident notes, expenses, km, night-before reminders | |
 | 5. Timesheets & payroll | Extra-hours approvals, SCHADS export (weekday / evening / night / Sat / Sun / public holiday / km) | |
-| 6. SaaS | Self-serve signup polish, subscription billing, custom domains | |
+| 6. SaaS | Custom domains ✅ · self-serve signup polish, subscription billing | Partly done |
 
 ## Local setup
 
@@ -54,7 +54,34 @@ organisation. You become its owner; invite staff from **Staff**.
    ```
    Public variables (`NEXT_PUBLIC_*`, `EMAIL_FROM`) go in `.env.production`
    at build time. Deploy with `npm run deploy`.
-3. Point your domain (e.g. `app.shepherdcare.com.au`) at the Worker.
+3. Point the platform domain (e.g. `app.careplatform.com.au`) at the Worker.
+
+## Customer domains (white-label)
+
+Each organisation can connect one hostname, e.g. `portal.shepherdcare.com.au`,
+from **Settings → Custom domain**. Their login page, installed app name and
+colours, and invitation links then use their own domain.
+
+How it works: Cloudflare for SaaS issues and renews SSL for each customer
+hostname (100 included free, then US$0.10/month each). The customer adds one
+CNAME record pointing at `CUSTOM_DOMAIN_CNAME_TARGET`.
+
+One-time platform setup in the Cloudflare dashboard (zone of the platform domain):
+1. SSL/TLS → Custom Hostnames → enable Cloudflare for SaaS.
+2. Create a proxied DNS record for the CNAME target, e.g.
+   `customers.careplatform.com.au`, and set it as the **fallback origin**.
+3. Workers Routes → add route `*/*` for the Worker so customer hostnames reach it.
+4. Create an API token with *SSL and Certificates: Edit* on the zone and set
+   `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ZONE_ID`, `CUSTOM_DOMAIN_CNAME_TARGET`.
+
+A path on a customer's main website (e.g. `shepherdcare.com.au/portal`) is
+handled with a redirect from their website builder — in Squarespace:
+Settings → Developer Tools → URL Mappings → `/portal -> https://portal.shepherdcare.com.au 301`.
+Serving the portal *under* a path would require the customer's whole domain to
+be proxied through Cloudflare, so it isn't the default.
+
+Sign-in uses email codes rather than links, so customer domains don't need to be
+registered as redirect URLs in Supabase.
 
 ## Security model
 

@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
+import { getHostTenant } from "@/lib/tenant";
 
 export type Role = "owner" | "admin" | "coordinator" | "staff";
 
@@ -16,6 +17,8 @@ export type Organisation = {
   brand_primary: string;
   brand_secondary: string;
   brand_accent: string;
+  custom_domain: string | null;
+  domain_status: "none" | "pending" | "active" | "error";
 };
 
 export type Membership = { role: Role; organisation: Organisation };
@@ -38,16 +41,24 @@ export const getMemberships = cache(async (): Promise<Membership[]> => {
   const { supabase, user } = await requireUser();
   const { data, error } = await supabase
     .from("org_members")
-    .select("role, organisation:organisations(id,name,slug,state,timezone,logo_path,brand_primary,brand_secondary,brand_accent)")
+    .select("role, organisation:organisations(id,name,slug,state,timezone,logo_path,brand_primary,brand_secondary,brand_accent,custom_domain,domain_status)")
     .eq("user_id", user.id)
     .eq("status", "active");
   if (error) throw error;
   return (data ?? []) as unknown as Membership[];
 });
 
-/** The organisation the user is currently working in (cookie-selected). */
+/** The organisation the user is currently working in. On a customer's own
+ *  domain it is always that organisation; on the platform domain it is the
+ *  cookie-selected one. */
 export const requireMembership = cache(async (): Promise<Membership> => {
   const memberships = await getMemberships();
+  const tenant = await getHostTenant();
+  if (tenant) {
+    const m = memberships.find((x) => x.organisation.id === tenant.id);
+    if (!m) redirect("/no-access");
+    return m;
+  }
   if (memberships.length === 0) redirect("/signup");
   const selected = (await cookies()).get(ORG_COOKIE)?.value;
   return memberships.find((m) => m.organisation.id === selected) ?? memberships[0];

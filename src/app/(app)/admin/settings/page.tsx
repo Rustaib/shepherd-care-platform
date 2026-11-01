@@ -1,5 +1,7 @@
 import { logoUrl, requireAdmin } from "@/lib/org";
 import { createClient } from "@/lib/supabase/server";
+import { env } from "@/lib/env";
+import { DomainForm } from "./domain-form";
 import { SettingsForm } from "./settings-form";
 
 export const metadata = { title: "Settings" };
@@ -14,6 +16,8 @@ export default async function SettingsPage() {
     <div className="space-y-6">
       <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
       <SettingsForm org={org!} logo={logoUrl(organisation)} />
+      <DomainForm domain={organisation.custom_domain} status={organisation.domain_status}
+        cnameTarget={env.cloudflare()?.cnameTarget ?? null} configured={!!env.cloudflare()} />
     </div>
   );
 }

@@ -24,6 +24,11 @@ create function storage.foldername(name text) returns text[] language sql immuta
 alter table storage.objects enable row level security;
 grant usage on schema auth, storage to authenticated, anon;
 grant execute on function auth.uid() to authenticated, anon;
+-- Mirror Supabase defaults: tables are granted to API roles when created,
+-- so a migration's REVOKE is what actually restricts them.
+grant usage on schema public to authenticated, anon;
+alter default privileges in schema public grant all on tables to authenticated, anon;
+alter default privileges in schema public grant all on sequences to authenticated, anon;
 `);
 
 for (const f of fs.readdirSync(dir).sort()) {
@@ -31,11 +36,6 @@ for (const f of fs.readdirSync(dir).sort()) {
   catch (e) { console.error("FAILED", f, e.message); process.exit(1); }
 }
 
-await db.exec(`
-grant usage on schema public to authenticated, anon;
-grant all on all tables in schema public to authenticated;
-grant usage on all sequences in schema public to authenticated;
-`);
 
 // --- Behaviour tests --------------------------------------------------------
 const U = { owner: "00000000-0000-0000-0000-000000000001", staff: "00000000-0000-0000-0000-000000000002",
@@ -111,6 +111,16 @@ await throws("staff cannot insert pre-approved claim",
 expect("audit log captured changes", (await as(U.owner, `select count(*)::int n from audit_log where organisation_id='${org}'`)).rows[0].n > 5);
 expect("staff cannot read audit log", (await as(U.staff, `select count(*)::int n from audit_log`)).rows[0].n === 0);
 expect("NSW holidays seeded", (await as(U.staff, `select count(*)::int n from public_holidays where state='NSW'`)).rows[0].n === 25);
+
+// Custom domains
+await throws("admin cannot set domain status directly",
+  () => as(U.owner, `update organisations set custom_domain='portal.example.com', domain_status='active' where id='${org}'`));
+await as(U.owner, `update organisations set brand_primary='#123456' where id='${org}'`);
+expect("admin can still edit branding", (await as(U.owner, `select brand_primary from organisations where id='${org}'`)).rows[0].brand_primary === "#123456");
+await db.exec(`reset role; update organisations set custom_domain='portal.example.com', domain_status='active' where id='${org}'`);
+await db.exec("set role anon");
+expect("anon resolves org by host", (await db.query(`select name from public.org_by_host('Portal.Example.com')`)).rows[0]?.name === "Shepherd Care");
+expect("unknown host resolves nothing", (await db.query(`select * from public.org_by_host('evil.example.com')`)).rows.length === 0);
 
 console.log(failures ? `\n${failures} FAILED` : "\nALL PASSED");
 process.exit(failures ? 1 : 0);

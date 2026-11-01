@@ -2,9 +2,9 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { escapeHtml, sendEmail } from "@/lib/email";
-import { env } from "@/lib/env";
 import { requireAdmin } from "@/lib/org";
 import { createClient } from "@/lib/supabase/server";
+import { portalUrl } from "@/lib/tenant";
 
 export type InviteState = { error?: string; ok?: string; link?: string } | undefined;
 
@@ -29,7 +29,7 @@ export async function inviteMember(_: InviteState, formData: FormData): Promise<
     return { error: error.code === "23505" ? "That person already has an open invitation." : error.message };
   }
 
-  const link = `${env.appUrl()}/invite/${data.token}`;
+  const link = `${portalUrl(org)}/invite/${data.token}`;
   const sent = await sendEmail(
     parsed.data.email,
     `You're invited to join ${org.name}`,

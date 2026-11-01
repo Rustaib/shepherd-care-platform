@@ -1,11 +1,15 @@
 import { AuthShell } from "@/components/auth-shell";
 import { OtpSignIn } from "@/components/otp-sign-in";
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getHostTenant } from "@/lib/tenant";
 import { OrgForm } from "./org-form";
 
 export const metadata = { title: "Create your organisation" };
 
 export default async function SignupPage() {
+  // New organisations are created on the platform domain, not a customer's.
+  if (await getHostTenant()) redirect("/login");
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
