@@ -13,7 +13,7 @@ const db = new PGlite({ extensions: { pgcrypto, btree_gist } });
 
 // --- Minimal Supabase stubs -------------------------------------------------
 await db.exec(`
-create role anon nologin; create role authenticated nologin;
+create role anon nologin; create role authenticated nologin; create role service_role nologin bypassrls;
 create schema auth; create schema storage;
 create table auth.users (id uuid primary key, email text, raw_user_meta_data jsonb default '{}');
 create function auth.uid() returns uuid language sql stable as
@@ -28,8 +28,9 @@ grant execute on function auth.uid() to authenticated, anon;
 -- Mirror Supabase defaults: tables are granted to API roles when created,
 -- so a migration's REVOKE is what actually restricts them.
 grant usage on schema public to authenticated, anon;
-alter default privileges in schema public grant all on tables to authenticated, anon;
-alter default privileges in schema public grant all on sequences to authenticated, anon;
+-- No default table privileges: mirrors new Supabase projects, where tables are
+-- not exposed automatically, so the migrations' explicit grants are tested.
+alter default privileges in schema public revoke execute on functions from public;
 `);
 
 for (const f of fs.readdirSync(dir).sort()) {

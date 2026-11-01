@@ -41,6 +41,9 @@ organisation. You become its owner; invite staff from **Staff**.
 
 ## Production setup (go-live checklist)
 
+A detailed step-by-step version of this checklist is kept in the project's Go-Live Guide.
+
+
 1. **Supabase** — create a project in **Sydney (ap-southeast-2)** on the Pro plan.
    - `npx supabase link --project-ref <ref>` then `npm run db:push` (applies all migrations,
      including NSW public holidays for 2026–27).
@@ -61,8 +64,8 @@ organisation. You become its owner; invite staff from **Staff**.
    npx wrangler secret put CRON_SECRET
    # optional: STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, CLOUDFLARE_API_TOKEN
    ```
-   Public variables (`NEXT_PUBLIC_*`, `EMAIL_FROM`, `STRIPE_PRICE_ID`, …) go in
-   `.env.production` at build time. Deploy with `npm run deploy`. The Worker's hourly
+   Browser-visible `NEXT_PUBLIC_*` values go in `.env.production` (read at build time);
+   other non-secret settings (`EMAIL_FROM`, `STRIPE_PRICE_ID`, …) go in `vars` in `wrangler.jsonc`. Deploy with `npm run deploy`. The Worker's hourly
    cron (`worker.ts`) sends reminders at each organisation's local reminder hour.
 5. Point the platform domain (e.g. `app.careplatform.com.au`) at the Worker.
 6. **Billing (optional, for selling to other providers)** — in Stripe create a product

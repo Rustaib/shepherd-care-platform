@@ -8,9 +8,18 @@
   "observability": { "enabled": true },
   // Hourly; reminders fire at each organisation's local reminder hour.
   "triggers": { "crons": ["5 * * * *"] },
+  // Non-secret runtime settings. Secrets go in with `npx wrangler secret put NAME`.
   "vars": {
-    // Public URL of the platform (used by the cron handler to call itself)
-    "APP_URL": "https://app.example.com.au"
+    // Public URL of the platform (the cron handler calls itself here)
+    "APP_URL": "https://app.example.com.au",
+    "EMAIL_FROM": "Care Platform <no-reply@example.com.au>",
+    "VAPID_CONTACT": "mailto:support@example.com.au",
+    // Custom domains (Step 7 of the go-live guide); leave blank to hide the feature
+    "CLOUDFLARE_ZONE_ID": "",
+    "CUSTOM_DOMAIN_CNAME_TARGET": "",
+    // Billing (optional); leave blank to switch billing off
+    "STRIPE_PRICE_ID": "",
+    "STRIPE_PER_SEAT": "false"
   }
   // Secrets (set with `npx wrangler secret put NAME`):
   //   SUPABASE_SERVICE_ROLE_KEY, CRON_SECRET, RESEND_API_KEY, VAPID_PRIVATE_JWK,
