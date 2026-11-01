@@ -15,8 +15,8 @@ installable PWA for iPhone and Android.
 |---|---|---|
 | 1. Foundation | Organisations + branding, email-code sign-in, invitations, roles, app shell, PWA, full database schema with security policies, audit log, NSW public holidays | ✅ Done |
 | 2. Participants | Participant records, NDIS plans, budgets by support category with used / booked / remaining | ✅ Done |
-| 3. Rostering | Calendar, shifts, appointments, open shifts | ⏳ Next |
-| 4. Staff mobile flow | My shifts, clock in/out, progress & incident notes, expenses, km, night-before reminders | |
+| 3. Rostering | Weekly roster, shifts (open, overnight, repeating), double-booking protection, publish / copy week, appointments | ✅ Done |
+| 4. Staff mobile flow | My shifts, clock in/out, progress & incident notes, expenses, km, night-before reminders | ⏳ Next |
 | 5. Timesheets & payroll | Extra-hours approvals, SCHADS export (weekday / evening / night / Sat / Sun / public holiday / km) | |
 | 6. SaaS | Custom domains ✅ · self-serve signup polish, subscription billing | Partly done |
 
@@ -97,7 +97,7 @@ registered as redirect URLs in Supabase.
   to `audit_log`.
 - Participant data is never cached on devices by the service worker.
 
-Run the database security tests with `npm run test:db`.
+Run the database security tests with `npm run test:db` and the time-zone tests with `npm run test:unit`.
 
 ## Project layout
 

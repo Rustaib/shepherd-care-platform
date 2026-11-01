@@ -4,11 +4,12 @@
 // Usage: npm run test:db
 import { PGlite } from "@electric-sql/pglite";
 import { pgcrypto } from "@electric-sql/pglite/contrib/pgcrypto";
+import { btree_gist } from "@electric-sql/pglite/contrib/btree_gist";
 import fs from "node:fs";
 import path from "node:path";
 
 const dir = process.argv[2] ?? new URL("../migrations", import.meta.url).pathname;
-const db = new PGlite({ extensions: { pgcrypto } });
+const db = new PGlite({ extensions: { pgcrypto, btree_gist } });
 
 // --- Minimal Supabase stubs -------------------------------------------------
 await db.exec(`
@@ -127,6 +128,16 @@ expect("budget committed counts upcoming shifts", usage?.committed === 140);
 expect("staff cannot see budgets", (await as(U.staff, `select count(*)::int n from plan_budget_usage`)).rows[0].n === 0);
 expect("staff can see rostered participant's plan", (await as(U.staff, `select count(*)::int n from ndis_plans`)).rows[0].n === 1);
 expect("other org sees no plans", (await as(U.other, `select count(*)::int n from ndis_plans`)).rows[0].n === 0);
+
+// Double booking
+await throws("cannot double-book a worker", () => as(U.owner, `insert into shifts (organisation_id,staff_user_id,starts_at,ends_at,status)
+  values ('${org}','${U.staff}', now() + interval '2 days 1 hour', now() + interval '2 days 5 hours','draft')`));
+await as(U.owner, `insert into shifts (organisation_id,staff_user_id,starts_at,ends_at,status)
+  values ('${org}','${U.staff}', now() + interval '2 days 2 hours', now() + interval '2 days 3 hours','cancelled')`);
+expect("cancelled shifts don't block", true);
+await as(U.owner, `insert into shifts (organisation_id,staff_user_id,starts_at,ends_at,status)
+  values ('${org}','${U.staff}', now() + interval '2 days 2 hours', now() + interval '2 days 4 hours','draft')`).then(
+  () => expect("back-to-back shift allowed", true), () => expect("back-to-back shift allowed", false));
 
 // Custom domains
 await throws("admin cannot set domain status directly",

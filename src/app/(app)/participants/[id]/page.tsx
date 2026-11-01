@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ageFrom, categoryLabel, displayName, formatDate, MANAGEMENT_LABEL, money } from "@/lib/ndis";
 import { isManager, requireMembership, requireUser } from "@/lib/org";
+import { dayLabel, timeLabel, utcToLocal } from "@/lib/time";
 import { setParticipantStatus } from "../actions";
 
 export const metadata = { title: "Participant" };
@@ -41,19 +42,43 @@ function BudgetBar({ u }: { u: Usage }) {
 
 export default async function ParticipantPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const { role } = await requireMembership();
+  const { role, organisation: org } = await requireMembership();
+  const tz = org.timezone;
   const manager = isManager(role);
   const { supabase } = await requireUser();
 
-  const [{ data: p }, { data: plans }, { data: usage }] = await Promise.all([
+  const nowIso = new Date().toISOString();
+  const twoWeeks = new Date(Date.now() + 14 * 864e5).toISOString();
+  const [{ data: p }, { data: plans }, { data: usage }, { data: upShifts }, { data: upAppts }] = await Promise.all([
     supabase.from("participants").select("*").eq("id", id).maybeSingle(),
     supabase.from("ndis_plans").select("id,start_date,end_date,management_type,status,plan_manager_name,plan_manager_email,goals")
       .eq("participant_id", id).order("start_date", { ascending: false }).returns<Plan[]>(),
     manager
       ? supabase.from("plan_budget_usage").select("*").order("category").returns<Usage[]>()
       : Promise.resolve({ data: [] as Usage[] }),
+    supabase.from("shifts").select("id,starts_at,ends_at,status,staff:profiles(full_name,email)")
+      .eq("participant_id", id).in("status", ["draft", "published", "in_progress"])
+      .gte("ends_at", nowIso).lte("starts_at", twoWeeks).order("starts_at")
+      .returns<{ id: string; starts_at: string; ends_at: string; status: string; staff: { full_name: string; email: string } | null }[]>(),
+    supabase.from("appointments").select("id,title,starts_at,location")
+      .eq("participant_id", id).gte("starts_at", nowIso).lte("starts_at", twoWeeks).order("starts_at")
+      .returns<{ id: string; title: string; starts_at: string; location: string | null }[]>(),
   ]);
   if (!p) notFound();
+  type Item = { kind: "shift" | "appt"; id: string; at: string; title: string; sub: string; href: string | null };
+  const upcoming: Item[] = [
+    ...(upShifts ?? []).map((s) => ({
+      kind: "shift" as const, id: s.id, at: s.starts_at,
+      title: `${timeLabel(s.starts_at, tz)}–${timeLabel(s.ends_at, tz)} support shift${s.status === "draft" ? " (draft)" : ""}`,
+      sub: s.staff ? (s.staff.full_name || s.staff.email) : "Open shift",
+      href: manager ? `/roster/shifts/${s.id}` : null,
+    })),
+    ...(upAppts ?? []).map((a) => ({
+      kind: "appt" as const, id: a.id, at: a.starts_at,
+      title: `${timeLabel(a.starts_at, tz)} ${a.title}`, sub: a.location ?? "",
+      href: manager ? `/roster/appointments/${a.id}` : null,
+    })),
+  ].sort((a, b) => a.at.localeCompare(b.at));
 
   const today = new Date().toISOString().slice(0, 10);
   const current = plans?.find((pl) => pl.start_date <= today && pl.end_date >= today && pl.status !== "draft");
@@ -105,6 +130,34 @@ export default async function ParticipantPage({ params }: { params: Promise<{ id
           </dl>
         </section>
       </div>
+
+      <section className="card space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-lg font-semibold">Next two weeks</h2>
+          {manager && (
+            <div className="flex gap-2">
+              <Link href={`/roster/appointments/new?participant=${id}`} className="btn-ghost">+ Appointment</Link>
+              <Link href={`/roster/shifts/new?participant=${id}`} className="btn-ghost">+ Shift</Link>
+            </div>
+          )}
+        </div>
+        {!upcoming.length ? <p className="text-sm text-muted">Nothing scheduled.</p> : (
+          <ul className="divide-y divide-line">
+            {upcoming.map((u) => {
+              const inner = (
+                <div className="flex items-center gap-3 py-2.5">
+                  <div className="w-24 shrink-0 text-sm font-medium">{dayLabel(utcToLocal(u.at, tz).date)}</div>
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-medium">{u.kind === "appt" ? "📅 " : ""}{u.title}</div>
+                    {u.sub && <div className={`truncate text-xs ${u.sub === "Open shift" ? "font-semibold text-danger" : "text-muted"}`}>{u.sub}</div>}
+                  </div>
+                </div>
+              );
+              return <li key={u.kind + u.id}>{u.href ? <Link href={u.href} className="block hover:bg-surface">{inner}</Link> : inner}</li>;
+            })}
+          </ul>
+        )}
+      </section>
 
       <section className="card space-y-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
