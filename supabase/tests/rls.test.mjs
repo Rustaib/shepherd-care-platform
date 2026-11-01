@@ -3,13 +3,12 @@
 // in-memory Postgres (PGlite) with minimal Supabase auth/storage stubs.
 // Usage: npm run test:db
 import { PGlite } from "@electric-sql/pglite";
-import { pgcrypto } from "@electric-sql/pglite/contrib/pgcrypto";
 import { btree_gist } from "@electric-sql/pglite/contrib/btree_gist";
 import fs from "node:fs";
 import path from "node:path";
 
 const dir = process.argv[2] ?? new URL("../migrations", import.meta.url).pathname;
-const db = new PGlite({ extensions: { pgcrypto, btree_gist } });
+const db = new PGlite({ extensions: { btree_gist } });
 
 // --- Minimal Supabase stubs -------------------------------------------------
 await db.exec(`

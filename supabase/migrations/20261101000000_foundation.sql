@@ -4,7 +4,8 @@
 -- by row-level security. Users can belong to more than one organisation.
 -- =============================================================================
 
-create extension if not exists pgcrypto;
+-- Uses only built-in gen_random_uuid(); no pgcrypto needed (on Supabase it
+-- lives in the `extensions` schema, which migrations can't see).
 
 -- -----------------------------------------------------------------------------
 -- Enums
@@ -154,7 +155,7 @@ create table public.invitations (
   organisation_id uuid not null references public.organisations(id) on delete cascade,
   email           text not null check (email = lower(email)),
   role            public.org_role not null default 'staff',
-  token           text not null unique default encode(gen_random_bytes(24), 'hex'),
+  token           text not null unique default replace(gen_random_uuid()::text || gen_random_uuid()::text, '-', ''),
   invited_by      uuid references auth.users(id) on delete set null,
   expires_at      timestamptz not null default now() + interval '7 days',
   accepted_at     timestamptz,
