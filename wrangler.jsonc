@@ -1,11 +1,18 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "shepherd-platform",
-  "main": ".open-next/worker.js",
+  "main": "worker.ts",
   "compatibility_date": "2026-10-01",
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
   "observability": { "enabled": true },
-  // Nightly shift reminders (6pm Sydney ≈ 07:00 UTC in AEDT, 08:00 UTC in AEST)
-  "triggers": { "crons": ["0 7 * * *"] }
+  // Hourly; reminders fire at each organisation's local reminder hour.
+  "triggers": { "crons": ["5 * * * *"] },
+  "vars": {
+    // Public URL of the platform (used by the cron handler to call itself)
+    "APP_URL": "https://app.example.com.au"
+  }
+  // Secrets (set with `npx wrangler secret put NAME`):
+  //   SUPABASE_SERVICE_ROLE_KEY, CRON_SECRET, RESEND_API_KEY, VAPID_PRIVATE_JWK,
+  //   STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, CLOUDFLARE_API_TOKEN
 }

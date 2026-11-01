@@ -40,3 +40,24 @@ export const INCIDENT_CATEGORIES: IncidentCategory[] = [
 ];
 
 export const categoryByValue = (v: string) => INCIDENT_CATEGORIES.find((c) => c.value === v);
+
+/** NDIS Commission notification deadline, counted from when the report was made. */
+export function notifyDeadline(category: string, reportedAt: string): Date | null {
+  const c = categoryByValue(category);
+  if (!c?.reportable) return null;
+  const d = new Date(reportedAt);
+  if (c.notifyWithin === "24_hours") return new Date(d.getTime() + 24 * 36e5);
+  let added = 0;
+  while (added < 5) {
+    d.setDate(d.getDate() + 1);
+    if (d.getDay() !== 0 && d.getDay() !== 6) added++;
+  }
+  return d;
+}
+
+export const INCIDENT_STATUS: Record<string, { label: string; cls: string }> = {
+  open: { label: "Open", cls: "bg-danger/10 text-danger" },
+  under_review: { label: "Under review", cls: "bg-accent/15 text-ink" },
+  reported_to_commission: { label: "Reported to Commission", cls: "bg-brand/10 text-brand" },
+  closed: { label: "Closed", cls: "bg-success/10 text-success" },
+};

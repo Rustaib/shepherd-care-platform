@@ -19,6 +19,9 @@ export type Organisation = {
   brand_accent: string;
   custom_domain: string | null;
   domain_status: "none" | "pending" | "active" | "error";
+  subscription_status: "trialing" | "active" | "past_due" | "cancelled";
+  trial_ends_at: string;
+  billing_exempt: boolean;
 };
 
 export type Membership = { role: Role; organisation: Organisation };
@@ -41,7 +44,7 @@ export const getMemberships = cache(async (): Promise<Membership[]> => {
   const { supabase, user } = await requireUser();
   const { data, error } = await supabase
     .from("org_members")
-    .select("role, organisation:organisations(id,name,slug,state,timezone,logo_path,brand_primary,brand_secondary,brand_accent,custom_domain,domain_status)")
+    .select("role, organisation:organisations(id,name,slug,state,timezone,logo_path,brand_primary,brand_secondary,brand_accent,custom_domain,domain_status,subscription_status,trial_ends_at,billing_exempt)")
     .eq("user_id", user.id)
     .eq("status", "active");
   if (error) throw error;

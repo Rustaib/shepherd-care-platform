@@ -1,9 +1,11 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const PUBLIC_PATHS = ["/login", "/invite", "/auth", "/signup"];
+const PUBLIC_PATHS = ["/login", "/invite", "/auth", "/signup", "/api/cron", "/api/stripe"];
 
 export async function middleware(request: NextRequest) {
+  // Let server components know the current path (used for billing lock exemptions)
+  request.headers.set("x-pathname", request.nextUrl.pathname);
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient(

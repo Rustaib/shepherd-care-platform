@@ -19,6 +19,7 @@ const eslintConfig = [
       "build/**",
       "next-env.d.ts",
       ".open-next/**",
+      "worker.ts",
       ".wrangler/**",
       "cloudflare-env.d.ts",
       "supabase/tests/**",

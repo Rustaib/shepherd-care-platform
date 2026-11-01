@@ -139,6 +139,19 @@ await as(U.owner, `insert into shifts (organisation_id,staff_user_id,starts_at,e
   values ('${org}','${U.staff}', now() + interval '2 days 2 hours', now() + interval '2 days 4 hours','draft')`).then(
   () => expect("back-to-back shift allowed", true), () => expect("back-to-back shift allowed", false));
 
+// Staff flow
+await throws("staff cannot attach a note to someone else's shift", async () => {
+  const other = (await as(U.owner, `insert into shifts (organisation_id,participant_id,staff_user_id,starts_at,ends_at,status)
+    values ('${org}','${p1}','${U.staff2}', now() + interval '5 days', now() + interval '5 days 2 hours','published') returning id`)).rows[0].id;
+  await as(U.staff, `insert into progress_notes (organisation_id,participant_id,shift_id,author_id,body) values ('${org}','${p1}','${other}','${U.staff}','x')`);
+});
+await throws("only one pending extra-hours request per shift",
+  () => as(U.staff, `insert into timesheet_adjustments (organisation_id,shift_id,staff_user_id,extra_minutes,reason) values ('${org}','${s1}','${U.staff}',15,'a'),('${org}','${s1}','${U.staff}',15,'b')`));
+await as(U.staff, `insert into push_subscriptions (user_id,endpoint,p256dh,auth) values ('${U.staff}','https://push.example/1','k','a')`);
+expect("push subscriptions are private", (await as(U.owner, `select count(*)::int n from push_subscriptions`)).rows[0].n === 0);
+await throws("admin cannot exempt own org from billing",
+  () => as(U.owner, `update organisations set billing_exempt = true where id='${org}'`));
+
 // Custom domains
 await throws("admin cannot set domain status directly",
   () => as(U.owner, `update organisations set custom_domain='portal.example.com', domain_status='active' where id='${org}'`));

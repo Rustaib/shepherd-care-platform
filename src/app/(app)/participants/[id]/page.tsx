@@ -49,7 +49,7 @@ export default async function ParticipantPage({ params }: { params: Promise<{ id
 
   const nowIso = new Date().toISOString();
   const twoWeeks = new Date(Date.now() + 14 * 864e5).toISOString();
-  const [{ data: p }, { data: plans }, { data: usage }, { data: upShifts }, { data: upAppts }] = await Promise.all([
+  const [{ data: p }, { data: plans }, { data: usage }, { data: upShifts }, { data: upAppts }, { data: notes }] = await Promise.all([
     supabase.from("participants").select("*").eq("id", id).maybeSingle(),
     supabase.from("ndis_plans").select("id,start_date,end_date,management_type,status,plan_manager_name,plan_manager_email,goals")
       .eq("participant_id", id).order("start_date", { ascending: false }).returns<Plan[]>(),
@@ -63,6 +63,9 @@ export default async function ParticipantPage({ params }: { params: Promise<{ id
     supabase.from("appointments").select("id,title,starts_at,location")
       .eq("participant_id", id).gte("starts_at", nowIso).lte("starts_at", twoWeeks).order("starts_at")
       .returns<{ id: string; title: string; starts_at: string; location: string | null }[]>(),
+    supabase.from("progress_notes").select("id,body,created_at,shift_id,goals_addressed,author:profiles(full_name)")
+      .eq("participant_id", id).order("created_at", { ascending: false }).limit(10)
+      .returns<{ id: string; body: string; created_at: string; shift_id: string | null; goals_addressed: string[] | null; author: { full_name: string } | null }[]>(),
   ]);
   if (!p) notFound();
   type Item = { kind: "shift" | "appt"; id: string; at: string; title: string; sub: string; href: string | null };
@@ -214,6 +217,24 @@ export default async function ParticipantPage({ params }: { params: Promise<{ id
               ))}
             </ul>
           </div>
+        )}
+      </section>
+
+      <section className="card space-y-3">
+        <h2 className="text-lg font-semibold">Recent progress notes</h2>
+        {!notes?.length ? <p className="text-sm text-muted">No progress notes yet.</p> : (
+          <ul className="space-y-4">
+            {notes.map((n) => (
+              <li key={n.id} className="border-b border-line pb-3 last:border-0">
+                <p className="mb-1 text-xs text-muted">
+                  {dayLabel(utcToLocal(n.created_at, tz).date)} {timeLabel(n.created_at, tz)} · {n.author?.full_name ?? "Staff"}
+                  {n.shift_id && <> · <Link href={`/shifts/${n.shift_id}`} className="text-brand underline">shift</Link></>}
+                </p>
+                <p className="whitespace-pre-wrap text-sm">{n.body}</p>
+                {!!n.goals_addressed?.length && <p className="mt-1 text-xs text-muted">Goals: {n.goals_addressed.join("; ")}</p>}
+              </li>
+            ))}
+          </ul>
         )}
       </section>
 
