@@ -12,7 +12,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const logo = logoUrl(org);
 
   const items: NavItem[] = [{ href: "/dashboard", label: "Home", icon: "home" }];
-  if (isManager(role)) items.push({ href: "/admin/staff", label: "Staff", icon: "users" });
+  if (isManager(role)) {
+    items.push({ href: "/participants", label: "Participants", icon: "person" });
+    items.push({ href: "/admin/staff", label: "Staff", icon: "users" });
+  }
   if (isAdmin(role)) items.push({ href: "/admin/settings", label: "Settings", icon: "settings" });
 
   return (

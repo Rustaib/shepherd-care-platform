@@ -5,7 +5,7 @@ import { isManager, requireMembership, requireUser } from "@/lib/org";
 export const metadata = { title: "Home" };
 
 type ShiftRow = {
-  id: string; starts_at: string; ends_at: string; break_minutes: number; status: string; location: string | null;
+  id: string; participant_id: string | null; starts_at: string; ends_at: string; break_minutes: number; status: string; location: string | null;
   participant: { first_name: string; last_name: string; preferred_name: string | null } | null;
 };
 
@@ -20,7 +20,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
   const fortnight = new Date(now.getTime() + 14 * 864e5);
   const { data: shifts } = await supabase
     .from("shifts")
-    .select("id,starts_at,ends_at,break_minutes,status,location,participant:participants(first_name,last_name,preferred_name)")
+    .select("id,participant_id,starts_at,ends_at,break_minutes,status,location,participant:participants(first_name,last_name,preferred_name)")
     .eq("organisation_id", org.id)
     .eq("staff_user_id", user.id)
     .neq("status", "cancelled")
@@ -44,7 +44,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
     stats = [
       { label: "Active team members", value: staff, href: "/admin/staff" },
       { label: "Pending invitations", value: invites, href: "/admin/staff" },
-      { label: "Active participants", value: participants },
+      { label: "Active participants", value: participants, href: "/participants" },
       { label: "Extra-hours requests", value: pending },
     ];
   }
@@ -88,7 +88,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
                     <div className="text-lg font-bold">{day.split(" ").slice(1).join(" ")}</div>
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="font-semibold">{p ? `${p.preferred_name || p.first_name} ${p.last_name}` : "Unassigned participant"}</div>
+                    <div className="font-semibold">{p ? <Link href={`/participants/${s.participant_id}`} className="hover:underline">{p.preferred_name || p.first_name} {p.last_name}</Link> : "No participant"}</div>
                     <div className="text-sm text-muted">{time} · {hoursBetween(s.starts_at, s.ends_at, s.break_minutes).toFixed(1)} h</div>
                     {s.location && <div className="truncate text-sm text-muted">{s.location}</div>}
                   </div>

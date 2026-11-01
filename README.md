@@ -14,8 +14,8 @@ installable PWA for iPhone and Android.
 | Phase | Scope | Status |
 |---|---|---|
 | 1. Foundation | Organisations + branding, email-code sign-in, invitations, roles, app shell, PWA, full database schema with security policies, audit log, NSW public holidays | ✅ Done |
-| 2. Participants | Participant records, NDIS plans, budgets by support category | ⏳ Next |
-| 3. Rostering | Calendar, shifts, appointments, open shifts | |
+| 2. Participants | Participant records, NDIS plans, budgets by support category with used / booked / remaining | ✅ Done |
+| 3. Rostering | Calendar, shifts, appointments, open shifts | ⏳ Next |
 | 4. Staff mobile flow | My shifts, clock in/out, progress & incident notes, expenses, km, night-before reminders | |
 | 5. Timesheets & payroll | Extra-hours approvals, SCHADS export (weekday / evening / night / Sat / Sun / public holiday / km) | |
 | 6. SaaS | Custom domains ✅ · self-serve signup polish, subscription billing | Partly done |

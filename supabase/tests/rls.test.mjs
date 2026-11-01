@@ -112,6 +112,22 @@ expect("audit log captured changes", (await as(U.owner, `select count(*)::int n 
 expect("staff cannot read audit log", (await as(U.staff, `select count(*)::int n from audit_log`)).rows[0].n === 0);
 expect("NSW holidays seeded", (await as(U.staff, `select count(*)::int n from public_holidays where state='NSW'`)).rows[0].n === 25);
 
+// Budget usage
+const plan = (await as(U.owner, `insert into ndis_plans (organisation_id,participant_id,start_date,end_date,management_type)
+  values ('${org}','${p1}','2026-07-01','2027-06-30','plan_managed') returning id`)).rows[0].id;
+const budget = (await as(U.owner, `insert into plan_budgets (organisation_id,plan_id,category,allocated_amount)
+  values ('${org}','${plan}','assistance_daily_life',10000) returning id`)).rows[0].id;
+// s1 is completed: 4h rostered + 45 min approved extra at $70/h = $332.50
+await as(U.owner, `update shifts set plan_budget_id='${budget}', charge_rate=70 where id='${s1}'`);
+await as(U.owner, `insert into shifts (organisation_id,participant_id,staff_user_id,starts_at,ends_at,status,plan_budget_id,charge_rate)
+  values ('${org}','${p1}','${U.staff}', now() + interval '2 days', now() + interval '2 days 2 hours','published','${budget}',70)`);
+const usage = (await as(U.owner, `select spent::float, committed::float from plan_budget_usage where plan_budget_id='${budget}'`)).rows[0];
+expect("budget spent includes approved extra hours", usage?.spent === 332.5);
+expect("budget committed counts upcoming shifts", usage?.committed === 140);
+expect("staff cannot see budgets", (await as(U.staff, `select count(*)::int n from plan_budget_usage`)).rows[0].n === 0);
+expect("staff can see rostered participant's plan", (await as(U.staff, `select count(*)::int n from ndis_plans`)).rows[0].n === 1);
+expect("other org sees no plans", (await as(U.other, `select count(*)::int n from ndis_plans`)).rows[0].n === 0);
+
 // Custom domains
 await throws("admin cannot set domain status directly",
   () => as(U.owner, `update organisations set custom_domain='portal.example.com', domain_status='active' where id='${org}'`));
