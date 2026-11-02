@@ -41,20 +41,33 @@ export function DomainForm({ domain, status, cnameTarget, configured }: {
 
           {status !== "active" && cnameTarget && (
             <div className="rounded-xl border border-line bg-surface p-4 text-sm">
-              <p className="mb-3 font-medium">Add this DNS record where your domain is managed (e.g. Squarespace → Domains → DNS):</p>
+              <p className="mb-3 font-medium">Add this DNS record wherever your domain&apos;s DNS is managed:</p>
               <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5">
                 <dt className="text-muted">Type</dt><dd className="font-mono">CNAME</dd>
-                <dt className="text-muted">Host</dt><dd className="font-mono">{sub}</dd>
-                <dt className="text-muted">Points to</dt><dd className="break-all font-mono">{cnameTarget}</dd>
+                <dt className="text-muted">Name / Host</dt><dd className="font-mono">{sub}</dd>
+                <dt className="text-muted">Value / Target</dt><dd className="break-all font-mono">{cnameTarget}</dd>
               </dl>
-              <p className="mt-3 text-muted">Then press <strong>Check status</strong>. SSL is issued automatically once DNS is detected — usually minutes, occasionally a few hours.</p>
+              <ul className="mt-3 list-disc space-y-1 pl-5 text-muted">
+                <li>Not sure where that is? It&apos;s usually the company you pay for the domain, or where your website is hosted. Look for &quot;DNS&quot;, &quot;DNS records&quot; or &quot;Manage DNS&quot;.</li>
+                <li>If your DNS is on Cloudflare, set the record&apos;s proxy status to <strong>DNS only</strong> (grey cloud).</li>
+                <li>Remove any existing record with the same name first.</li>
+              </ul>
+              <p className="mt-3 text-muted">Then press <strong>Check status</strong>. SSL is issued automatically once the record is detected — usually within minutes, occasionally a few hours.</p>
             </div>
           )}
 
           <details className="rounded-xl border border-line p-4 text-sm">
-            <summary className="cursor-pointer font-medium">Optional: also open the portal from yourbusiness.com.au/portal</summary>
-            <p className="mt-2 text-muted">In Squarespace go to Settings → Developer Tools → URL Mappings and add:</p>
-            <pre className="mt-2 overflow-x-auto rounded-lg bg-surface p-3 font-mono text-xs">/portal -&gt; https://{domain} 301</pre>
+            <summary className="cursor-pointer font-medium">Optional: open the portal from a page on your main website</summary>
+            <p className="mt-2 text-muted">
+              To let people reach the portal from an address like <span className="font-mono">yourbusiness.com.au/portal</span>, add a
+              permanent (301) redirect in your website builder or DNS provider — usually under a setting called
+              &quot;Redirects&quot;, &quot;URL redirects&quot; or &quot;URL mappings&quot;:
+            </p>
+            <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 rounded-lg bg-surface p-3">
+              <dt className="text-muted">From</dt><dd className="font-mono">/portal</dd>
+              <dt className="text-muted">To</dt><dd className="break-all font-mono">https://{domain}</dd>
+              <dt className="text-muted">Type</dt><dd>Permanent (301)</dd>
+            </dl>
           </details>
 
           <div className="flex flex-wrap gap-2">

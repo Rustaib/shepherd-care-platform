@@ -2,6 +2,7 @@
 import { useActionState, useState } from "react";
 import { readableOn } from "@/lib/brand";
 import { saveSettings } from "./actions";
+import { LogoPicker } from "./logo-picker";
 
 type Org = {
   name: string; abn: string | null; ndis_registration_number: string | null; state: string;
@@ -28,7 +29,6 @@ export function SettingsForm({ org, logo }: { org: Org; logo: string | null }) {
   const [primary, setPrimary] = useState(org.brand_primary);
   const [secondary, setSecondary] = useState(org.brand_secondary);
   const [accent, setAccent] = useState(org.brand_accent);
-  const [preview, setPreview] = useState<string | null>(logo);
 
   return (
     <form action={action} className="space-y-6">
@@ -58,20 +58,7 @@ export function SettingsForm({ org, logo }: { org: Org; logo: string | null }) {
 
       <section className="card space-y-4">
         <h2 className="text-lg font-semibold">Branding</h2>
-        <div className="flex flex-wrap items-center gap-4">
-          <div className="grid h-20 w-40 place-items-center rounded-xl border border-dashed border-line bg-surface p-2">
-            {preview
-              // eslint-disable-next-line @next/next/no-img-element
-              ? <img src={preview} alt="Logo preview" className="max-h-full max-w-full object-contain" />
-              : <span className="text-xs text-muted">No logo</span>}
-          </div>
-          <div className="space-y-2">
-            <input type="file" name="logo" accept="image/png,image/jpeg,image/webp" className="text-sm"
-              onChange={(e) => { const f = e.target.files?.[0]; if (f) setPreview(URL.createObjectURL(f)); }} />
-            <p className="text-xs text-muted">PNG, JPG or WebP, under 2 MB. A wide logo on a transparent background works best.</p>
-            {logo && <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="remove_logo" /> Remove current logo</label>}
-          </div>
-        </div>
+        <LogoPicker key={logo ?? "none"} current={logo} />
         <div className="grid gap-4 sm:grid-cols-3">
           <ColourField name="brand_primary" label="Primary" value={primary} onChange={setPrimary} />
           <ColourField name="brand_secondary" label="Secondary" value={secondary} onChange={setSecondary} />
