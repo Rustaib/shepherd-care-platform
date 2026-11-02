@@ -1,9 +1,12 @@
 "use server";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { z } from "zod";
-import { RECEIPT_TYPES } from "@/lib/claims";
+import { expenseLabel, RECEIPT_TYPES } from "@/lib/claims";
+import { displayName, money } from "@/lib/ndis";
+import { notifyManagers } from "@/lib/notify";
 import { requireMembership, requireUser } from "@/lib/org";
-import { isValidDate } from "@/lib/time";
+import { dayLabel, isValidDate, timeLabel, utcToLocal } from "@/lib/time";
 import { readUpload } from "@/lib/upload";
 
 export type ActionResult = { error?: string; ok?: string } | undefined;
@@ -19,6 +22,24 @@ async function ownShift(shiftId: string) {
 }
 
 const done = (shiftId: string, ok: string): ActionResult => { revalidatePath(`/shifts/${shiftId}`); return { ok }; };
+
+type Ctx = Awaited<ReturnType<typeof ownShift>>;
+
+/** Names and times for notification emails. */
+async function describe({ supabase, user, org, shift }: Ctx) {
+  const [{ data: me }, { data: p }] = await Promise.all([
+    supabase.from("profiles").select("full_name,email").eq("id", user.id).single(),
+    shift.participant_id
+      ? supabase.from("participants").select("first_name,last_name,preferred_name").eq("id", shift.participant_id).single()
+      : Promise.resolve({ data: null }),
+  ]);
+  const tz = org.timezone;
+  return {
+    worker: me?.full_name || me?.email || "A support worker",
+    participant: p ? displayName(p) : "No participant",
+    when: `${dayLabel(utcToLocal(shift.starts_at, tz).date)}, ${timeLabel(shift.starts_at, tz)}–${timeLabel(shift.ends_at, tz)}`,
+  };
+}
 
 export async function clockIn(shiftId: string, lat: number | null, lng: number | null): Promise<ActionResult> {
   const { supabase } = await requireUser();
@@ -38,7 +59,8 @@ export async function clockOut(shiftId: string): Promise<ActionResult> {
 
 export async function addNote(shiftId: string, _: ActionResult, formData: FormData): Promise<ActionResult> {
   try {
-    const { supabase, user, shift } = await ownShift(shiftId);
+    const ctx = await ownShift(shiftId);
+    const { supabase, user, shift } = ctx;
     if (!shift.participant_id) return { error: "This shift has no participant." };
     const body = String(formData.get("body") ?? "").trim();
     if (body.length < 10) return { error: "Please write a little more detail (at least 10 characters)." };
@@ -48,6 +70,15 @@ export async function addNote(shiftId: string, _: ActionResult, formData: FormDa
       author_id: user.id, body, goals_addressed: goals.length ? goals : null,
     });
     if (error) return { error: error.message };
+    after(async () => {
+      const d = await describe(ctx);
+      await notifyManagers({
+        org: ctx.org, kind: "progress_notes", actorId: user.id,
+        subject: `Progress note: ${d.participant} — ${d.worker}`, heading: `New progress note for ${d.participant}`,
+        rows: [["Written by", d.worker], ["Shift", d.when], ...(goals.length ? [["Goals", goals.join("; ")] as [string, string]] : [])],
+        body, linkPath: `/shifts/${shiftId}`, linkLabel: "Open the shift",
+      });
+    });
     return done(shiftId, "Progress note saved.");
   } catch (e) { return { error: (e as Error).message }; }
 }
@@ -69,7 +100,8 @@ const expenseSchema = z.object({
 
 export async function addExpense(shiftId: string, _: ActionResult, formData: FormData): Promise<ActionResult> {
   try {
-    const { supabase, user, shift } = await ownShift(shiftId);
+    const ctx = await ownShift(shiftId);
+    const { supabase, user, shift } = ctx;
     const parsed = expenseSchema.safeParse(Object.fromEntries(formData));
     if (!parsed.success) return { error: parsed.error.issues[0].message };
 
@@ -88,6 +120,16 @@ export async function addExpense(shiftId: string, _: ActionResult, formData: For
       staff_user_id: user.id, ...parsed.data, receipt_path,
     });
     if (error) return { error: error.message };
+    after(async () => {
+      const d = await describe(ctx);
+      await notifyManagers({
+        org: ctx.org, kind: "expenses", actorId: user.id,
+        subject: `Expense claim: ${money(parsed.data.amount)} — ${d.worker}`, heading: `${d.worker} claimed ${money(parsed.data.amount)}`,
+        rows: [["Category", expenseLabel(parsed.data.category)], ["For", parsed.data.description], ["Participant", d.participant],
+               ["Shift", d.when], ["Receipt", receipt_path ? "Attached" : "None"]],
+        linkPath: "/approvals", linkLabel: "Review in Approvals",
+      });
+    });
     return done(shiftId, "Expense claim submitted.");
   } catch (e) { return { error: (e as Error).message }; }
 }
@@ -102,7 +144,8 @@ const kmSchema = z.object({
 
 export async function addKm(shiftId: string, _: ActionResult, formData: FormData): Promise<ActionResult> {
   try {
-    const { supabase, user, shift } = await ownShift(shiftId);
+    const ctx = await ownShift(shiftId);
+    const { supabase, user, shift } = ctx;
     const parsed = kmSchema.safeParse(Object.fromEntries(formData));
     if (!parsed.success) return { error: parsed.error.issues[0].message };
     const { error } = await supabase.from("travel_logs").insert({
@@ -110,13 +153,25 @@ export async function addKm(shiftId: string, _: ActionResult, formData: FormData
       staff_user_id: user.id, ...parsed.data, kilometres: Math.round(parsed.data.kilometres * 10) / 10,
     });
     if (error) return { error: error.message };
+    after(async () => {
+      const d = await describe(ctx);
+      const km = Math.round(parsed.data.kilometres * 10) / 10;
+      await notifyManagers({
+        org: ctx.org, kind: "travel", actorId: user.id,
+        subject: `Kilometres: ${km} km — ${d.worker}`, heading: `${d.worker} logged ${km} km`,
+        rows: [["Purpose", parsed.data.purpose], ["From → to", `${parsed.data.from_location ?? "?"} → ${parsed.data.to_location ?? "?"}`],
+               ["Participant", d.participant], ["Shift", d.when]],
+        linkPath: "/approvals", linkLabel: "Review in Approvals",
+      });
+    });
     return done(shiftId, "Kilometres logged.");
   } catch (e) { return { error: (e as Error).message }; }
 }
 
 export async function requestExtraHours(shiftId: string, _: ActionResult, formData: FormData): Promise<ActionResult> {
   try {
-    const { supabase, user, shift } = await ownShift(shiftId);
+    const ctx = await ownShift(shiftId);
+    const { supabase, user, shift } = ctx;
     if (Date.parse(shift.starts_at) > Date.now()) return { error: "You can request extra time once the shift has started." };
     const minutes = Number(formData.get("extra_minutes"));
     const reason = String(formData.get("reason") ?? "").trim();
@@ -126,6 +181,15 @@ export async function requestExtraHours(shiftId: string, _: ActionResult, formDa
       organisation_id: shift.organisation_id, shift_id: shiftId, staff_user_id: user.id, extra_minutes: minutes, reason,
     });
     if (error) return { error: error.code === "23505" ? "You already have a pending request for this shift." : error.message };
+    after(async () => {
+      const d = await describe(ctx);
+      await notifyManagers({
+        org: ctx.org, kind: "expenses", actorId: user.id,
+        subject: `Extra hours: +${minutes} min — ${d.worker}`, heading: `${d.worker} requested ${minutes} extra minutes`,
+        rows: [["Reason", reason], ["Participant", d.participant], ["Shift", d.when]],
+        linkPath: "/approvals", linkLabel: "Review in Approvals",
+      });
+    });
     return done(shiftId, "Request sent for approval.");
   } catch (e) { return { error: (e as Error).message }; }
 }

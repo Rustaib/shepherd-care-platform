@@ -1,13 +1,13 @@
 "use server";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
+import { displayName } from "@/lib/ndis";
+import { notifyManagers } from "@/lib/notify";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { escapeHtml, sendEmail } from "@/lib/email";
 import { categoryByValue, INCIDENT_CATEGORIES } from "@/lib/incidents";
 import { requireManager, requireMembership, requireUser } from "@/lib/org";
-import { createServiceClient } from "@/lib/supabase/server";
 import { isValidDate, isValidTime, localToUtc } from "@/lib/time";
-import { portalUrl } from "@/lib/tenant";
 
 export type IncidentState = { error?: string } | undefined;
 
@@ -42,19 +42,26 @@ export async function reportIncident(_: IncidentState, formData: FormData): Prom
   }).select("id").single();
   if (error) return { error: error.message };
 
-  // Alert managers by email for reportable or serious incidents
-  if (cat.reportable || d.severity === "high" || d.severity === "critical") {
-    const admin = createServiceClient();
-    const { data: managers } = await admin.from("org_members").select("profile:profiles(email)")
-      .eq("organisation_id", org.id).eq("status", "active").in("role", ["owner", "admin", "coordinator"]);
-    const link = `${portalUrl(org)}/incidents/${data.id}`;
-    const subject = `${cat.reportable ? "REPORTABLE " : ""}incident: ${cat.label}`;
-    const html = `<p><strong>${escapeHtml(cat.label)}</strong> (severity: ${d.severity}) was reported.</p>
-      ${cat.reportable ? `<p style="color:#b42318"><strong>This may be reportable to the NDIS Commission within ${cat.notifyWithin === "24_hours" ? "24 hours" : "5 business days"}.</strong></p>` : ""}
-      <p>${escapeHtml(d.description).slice(0, 500)}</p><p><a href="${link}">Open the incident report</a></p>`;
-    const emails = ((managers ?? []) as unknown as { profile: { email: string } }[]).map((m) => m.profile.email);
-    await Promise.all(emails.map((e) => sendEmail(e, subject, html)));
-  }
+  // Email managers. Reportable or serious incidents always reach owners and
+  // admins, whatever their email preferences.
+  const serious = cat.reportable || d.severity === "high" || d.severity === "critical";
+  after(async () => {
+    const [{ data: me }, { data: p }] = await Promise.all([
+      supabase.from("profiles").select("full_name,email").eq("id", user.id).single(),
+      d.participant_id ? supabase.from("participants").select("first_name,last_name,preferred_name").eq("id", d.participant_id).single() : Promise.resolve({ data: null }),
+    ]);
+    await notifyManagers({
+      org, kind: "incidents", actorId: user.id, always: serious,
+      subject: `${cat.reportable ? "REPORTABLE incident" : "Incident"}: ${cat.label}${p ? ` — ${displayName(p)}` : ""}`,
+      heading: cat.reportable
+        ? `Reportable incident — notify the NDIS Commission within ${cat.notifyWithin === "24_hours" ? "24 hours" : "5 business days"}`
+        : `Incident reported: ${cat.label}`,
+      rows: [["Type", cat.label], ["Severity", d.severity], ["Participant", p ? displayName(p) : "—"],
+             ["When", `${d.date} ${d.time}`], ["Where", d.location ?? "—"], ["Reported by", me?.full_name || me?.email || "Staff"],
+             ["Immediate action", d.immediate_action]],
+      body: d.description, linkPath: `/incidents/${data.id}`, linkLabel: "Open the incident report",
+    });
+  });
   revalidatePath("/incidents");
   redirect(`/incidents/${data.id}?submitted=1`);
 }

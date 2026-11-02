@@ -172,5 +172,21 @@ await throws("staff cannot change app name", async () => {
   if (!r.rows.length) throw new Error("no rows");
 });
 
+// Appointment ↔ shift links and notification preferences
+const apptId = (await as(U.owner, `insert into appointments (organisation_id,participant_id,title,starts_at,shift_id)
+  values ('${org}','${p1}','GP', now() + interval '1 hour','${s1}') returning id`)).rows[0].id;
+expect("appointment linked to shift", !!apptId);
+await throws("cannot link appointment to another participant's shift", async () => {
+  const sOther = (await as(U.owner, `insert into shifts (organisation_id,participant_id,starts_at,ends_at,status)
+    values ('${org}','${p2}', now() + interval '9 days', now() + interval '9 days 2 hours','draft') returning id`)).rows[0].id;
+  await as(U.owner, `insert into appointments (organisation_id,participant_id,title,starts_at,shift_id) values ('${org}','${p1}','X', now(),'${sOther}')`);
+});
+await as(U.owner, `update appointments set reminder_sent_at = now() where id='${apptId}'`);
+await as(U.owner, `update appointments set starts_at = starts_at + interval '1 hour' where id='${apptId}'`);
+expect("moving an appointment re-arms its reminder", (await as(U.owner, `select reminder_sent_at from appointments where id='${apptId}'`)).rows[0].reminder_sent_at === null);
+await as(U.staff, `select public.set_my_notifications('${org}', false, true, true, true)`);
+expect("member can set own notification preferences", (await as(U.staff, `select notify_progress_notes from org_members where user_id='${U.staff}'`)).rows[0].notify_progress_notes === false);
+await throws("cannot set preferences for an org you're not in", () => as(U.other, `select public.set_my_notifications('${org}', true, true, true, true)`));
+
 console.log(failures ? `\n${failures} FAILED` : "\nALL PASSED");
 process.exit(failures ? 1 : 0);

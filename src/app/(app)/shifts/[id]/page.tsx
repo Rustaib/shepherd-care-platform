@@ -4,6 +4,7 @@ import { CLAIM_STATUS, expenseLabel } from "@/lib/claims";
 import { displayName, money } from "@/lib/ndis";
 import { isManager, requireMembership, requireUser } from "@/lib/org";
 import { dayLabel, timeLabel, utcToLocal } from "@/lib/time";
+import { directionsUrl, shiftAppointments } from "@/lib/appointments";
 import { ClockPanel, EditableNote, ExpenseForm, ExtraHoursForm, KmForm, NoteForm, WithdrawButton } from "../shift-client";
 
 export const metadata = { title: "Shift" };
@@ -42,11 +43,9 @@ export default async function ShiftPage({ params }: { params: Promise<{ id: stri
   const started = Date.parse(s.starts_at) <= Date.now() || ["in_progress", "completed"].includes(s.status);
   const canClockIn = Date.now() >= Date.parse(s.starts_at) - 2 * 36e5 && Date.now() <= Date.parse(s.ends_at);
   const st = utcToLocal(s.starts_at, tz);
-  const windowStart = new Date(Date.parse(s.starts_at) - 36e5).toISOString();
 
-  const [{ data: appts }, { data: notes }, { data: plan }, { data: expenses }, { data: km }, { data: extra }] = await Promise.all([
-    p ? supabase.from("appointments").select("id,title,starts_at,location,notes").eq("participant_id", p.id)
-      .gte("starts_at", windowStart).lte("starts_at", s.ends_at).order("starts_at") : Promise.resolve({ data: [] }),
+  const [appts, { data: notes }, { data: plan }, { data: expenses }, { data: km }, { data: extra }] = await Promise.all([
+    shiftAppointments(supabase, s),
     supabase.from("progress_notes").select("id,body,goals_addressed,created_at,author_id,author:profiles(full_name)")
       .eq("shift_id", id).order("created_at"),
     p ? supabase.from("ndis_plans").select("goals").eq("participant_id", p.id)
@@ -94,12 +93,21 @@ export default async function ShiftPage({ params }: { params: Promise<{ id: stri
         )}
       </header>
 
-      {!!appts?.length && (
-        <section className="card border-accent/50 bg-accent/5 space-y-2">
-          <h2 className="font-semibold">📅 Appointments during this shift</h2>
-          <ul className="space-y-2 text-sm">
+      {appts.length > 0 && (
+        <section className="card space-y-3 border-accent/50 bg-accent/5">
+          <h2 className="font-semibold">📅 Appointments on this shift</h2>
+          <ul className="space-y-3 text-sm">
             {appts.map((a) => (
-              <li key={a.id}><strong>{timeLabel(a.starts_at, tz)} {a.title}</strong>{a.location && ` · ${a.location}`}{a.notes && <div className="text-muted">{a.notes}</div>}</li>
+              <li key={a.id} className="rounded-xl bg-card p-3">
+                <div className="font-semibold">
+                  {timeLabel(a.starts_at, tz)}{a.ends_at && `–${timeLabel(a.ends_at, tz)}`} · {a.title}
+                </div>
+                {a.location && <div className="mt-0.5 text-muted">📍 {a.location}</div>}
+                {a.notes && <div className="mt-1 whitespace-pre-wrap">{a.notes}</div>}
+                {a.location && (
+                  <a href={directionsUrl(a.location)} target="_blank" rel="noreferrer" className="btn-primary mt-2 px-3 py-1.5 text-sm">Get directions</a>
+                )}
+              </li>
             ))}
           </ul>
         </section>

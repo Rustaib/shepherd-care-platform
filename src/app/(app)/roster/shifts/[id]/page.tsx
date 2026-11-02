@@ -2,7 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ConfirmButton } from "@/components/confirm-button";
 import { requireManager, requireUser } from "@/lib/org";
-import { mondayOf, utcToLocal } from "@/lib/time";
+import { mondayOf, timeLabel, utcToLocal } from "@/lib/time";
+import { shiftAppointments } from "@/lib/appointments";
 import { cancelShift, deleteShift, saveShift } from "../../actions";
 import { getRosterOptions } from "../../options";
 import { ShiftForm } from "../../shift-form";
@@ -20,6 +21,7 @@ export default async function EditShift({ params }: { params: Promise<{ id: stri
   if (!s) notFound();
 
   const st = utcToLocal(s.starts_at, org.timezone), en = utcToLocal(s.ends_at, org.timezone);
+  const appts = await shiftAppointments(supabase, s);
   const week = mondayOf(st.date);
   const locked = ["in_progress", "completed"].includes(s.status);
 
@@ -38,6 +40,28 @@ export default async function EditShift({ params }: { params: Promise<{ id: stri
           Clocked in {utcToLocal(s.clock_in_at, org.timezone).time}
           {s.clock_out_at && <> · clocked out {utcToLocal(s.clock_out_at, org.timezone).time}</>}
         </div>
+      )}
+      {s.participant_id && (
+        <section className="card space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-lg font-semibold">Appointments on this shift</h2>
+            <Link href={`/roster/appointments/new?shift=${id}`} className="btn-ghost">+ Add appointment</Link>
+          </div>
+          {!appts.length ? (
+            <p className="text-sm text-muted">None. Appointments for this participant during the shift, or linked to it, appear here and in the worker&apos;s reminders.</p>
+          ) : (
+            <ul className="divide-y divide-line">
+              {appts.map((a) => (
+                <li key={a.id} className="flex flex-wrap items-center gap-3 py-2 text-sm">
+                  <span className="w-16 font-medium tabular-nums">{timeLabel(a.starts_at, org.timezone)}</span>
+                  <span className="min-w-0 flex-1">{a.title}{a.location ? <span className="text-muted"> · {a.location}</span> : null}</span>
+                  {a.shift_id === id ? <span className="badge">Linked</span> : <span className="badge">During shift</span>}
+                  <Link href={`/roster/appointments/${a.id}`} className="text-brand underline">Edit</Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
       )}
       <ShiftForm action={saveShift.bind(null, id)} isNew={false} locked={locked} cancelHref={`/roster?week=${week}`}
         staff={options.staff} participants={options.participants}

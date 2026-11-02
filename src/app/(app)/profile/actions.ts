@@ -1,6 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import { requireUser } from "@/lib/org";
+import { requireMembership, requireUser } from "@/lib/org";
 
 export async function saveProfile(_: { error?: string; ok?: string } | undefined, formData: FormData) {
   const { supabase, user } = await requireUser();
@@ -11,4 +11,17 @@ export async function saveProfile(_: { error?: string; ok?: string } | undefined
   if (error) return { error: error.message };
   revalidatePath("/", "layout");
   return { ok: "Saved." };
+}
+
+export async function saveNotifications(_: { error?: string; ok?: string } | undefined, formData: FormData) {
+  const { organisation: org } = await requireMembership();
+  const { supabase } = await requireUser();
+  const on = (k: string) => formData.get(k) === "on";
+  const { error } = await supabase.rpc("set_my_notifications", {
+    p_org: org.id, p_progress_notes: on("progress_notes"), p_expenses: on("expenses"),
+    p_travel: on("travel"), p_incidents: on("incidents"),
+  });
+  if (error) return { error: error.message };
+  revalidatePath("/profile");
+  return { ok: "Email preferences saved." };
 }
