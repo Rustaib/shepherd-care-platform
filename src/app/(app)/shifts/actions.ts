@@ -4,6 +4,7 @@ import { z } from "zod";
 import { RECEIPT_TYPES } from "@/lib/claims";
 import { requireMembership, requireUser } from "@/lib/org";
 import { isValidDate } from "@/lib/time";
+import { readUpload } from "@/lib/upload";
 
 export type ActionResult = { error?: string; ok?: string } | undefined;
 
@@ -73,13 +74,13 @@ export async function addExpense(shiftId: string, _: ActionResult, formData: For
     if (!parsed.success) return { error: parsed.error.issues[0].message };
 
     let receipt_path: string | null = null;
-    const file = formData.get("receipt");
-    if (file instanceof File && file.size > 0) {
+    const file = await readUpload(formData.get("receipt"));
+    if (file) {
       const ext = RECEIPT_TYPES[file.type];
       if (!ext) return { error: "Receipt must be a photo or PDF." };
       if (file.size > 8 * 1024 * 1024) return { error: "Receipt must be under 8 MB." };
       receipt_path = `${shift.organisation_id}/${user.id}/${crypto.randomUUID()}.${ext}`;
-      const { error } = await supabase.storage.from("receipts").upload(receipt_path, file, { contentType: file.type });
+      const { error } = await supabase.storage.from("receipts").upload(receipt_path, file.bytes, { contentType: file.type });
       if (error) return { error: `Receipt upload failed: ${error.message}` };
     }
     const { error } = await supabase.from("expense_claims").insert({

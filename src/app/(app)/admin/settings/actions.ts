@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireAdmin } from "@/lib/org";
 import { createClient } from "@/lib/supabase/server";
+import { readUpload } from "@/lib/upload";
 
 export type SettingsState = { error?: string; ok?: string } | undefined;
 
@@ -31,13 +32,13 @@ export async function saveSettings(_: SettingsState, formData: FormData): Promis
     ndis_registration_number: parsed.data.ndis_registration_number || null,
   };
 
-  const logo = formData.get("logo");
-  if (logo instanceof File && logo.size > 0) {
+  const logo = await readUpload(formData.get("logo"));
+  if (logo) {
     const ext = LOGO_TYPES[logo.type];
     if (!ext) return { error: "Logo must be a PNG, JPG or WebP image." };
     if (logo.size > 2 * 1024 * 1024) return { error: "Logo must be under 2 MB." };
     const path = `${org.id}/logo-${Date.now()}.${ext}`;
-    const { error } = await supabase.storage.from("org-assets").upload(path, logo, { contentType: logo.type, upsert: false });
+    const { error } = await supabase.storage.from("org-assets").upload(path, logo.bytes, { contentType: logo.type, upsert: false });
     if (error) return { error: `Logo upload failed: ${error.message}` };
     update.logo_path = path;
     if (org.logo_path) await supabase.storage.from("org-assets").remove([org.logo_path]);

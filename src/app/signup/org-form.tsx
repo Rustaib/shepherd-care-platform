@@ -14,7 +14,7 @@ export function OrgForm({ defaultName }: { defaultName: string }) {
       </div>
       <div>
         <label htmlFor="name" className="label">Organisation name</label>
-        <input id="name" name="name" className="field" required placeholder="e.g. Shepherd Care Australia" />
+        <input id="name" name="name" className="field" required placeholder="e.g. Acme Support Services" />
       </div>
       <div>
         <label htmlFor="state" className="label">State (sets public holidays)</label>
