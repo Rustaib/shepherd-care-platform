@@ -2,11 +2,12 @@
 import { useActionState, useState } from "react";
 import { readableOn } from "@/lib/brand";
 import { saveSettings } from "./actions";
+import { AppIconSection } from "./app-icon";
 import { LogoPicker } from "./logo-picker";
 
 type Org = {
   name: string; abn: string | null; ndis_registration_number: string | null; state: string;
-  brand_primary: string; brand_secondary: string; brand_accent: string;
+  brand_primary: string; brand_secondary: string; brand_accent: string; app_name: string | null;
 };
 
 const STATES = ["NSW", "VIC", "QLD", "SA", "WA", "TAS", "ACT", "NT"];
@@ -24,7 +25,7 @@ function ColourField({ name, label, value, onChange }: { name: string; label: st
   );
 }
 
-export function SettingsForm({ org, logo }: { org: Org; logo: string | null }) {
+export function SettingsForm({ org, logo, appIcon }: { org: Org; logo: string | null; appIcon: string | null }) {
   const [state, action, pending] = useActionState(saveSettings, undefined);
   const [primary, setPrimary] = useState(org.brand_primary);
   const [secondary, setSecondary] = useState(org.brand_secondary);
@@ -73,6 +74,8 @@ export function SettingsForm({ org, logo }: { org: Org; logo: string | null }) {
           </div>
         </div>
       </section>
+
+      <AppIconSection key={appIcon ?? "default"} orgName={org.name} appName={org.app_name} iconUrl={appIcon} logoUrl={logo} primary={primary} />
 
       <div className="flex items-center gap-3">
         <button className="btn-primary" disabled={pending}>{pending ? "Saving…" : "Save settings"}</button>

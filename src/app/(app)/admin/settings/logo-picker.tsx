@@ -24,9 +24,11 @@ export function LogoPicker({ current }: { current: string | null }) {
       dt.items.add(file);
       input.current.files = dt.files;
     }
-    setPreview(URL.createObjectURL(file));
+    const url = URL.createObjectURL(file);
+    setPreview(url);
     setFileName(file.name);
     setRemoved(false);
+    window.dispatchEvent(new CustomEvent("logo-change", { detail: url }));
   };
   const reject = (msg: string) => {
     setError(msg);
@@ -38,6 +40,7 @@ export function LogoPicker({ current }: { current: string | null }) {
     setFileName(null);
     setRemoved(!!current);
     setError(null);
+    window.dispatchEvent(new CustomEvent("logo-change", { detail: null }));
   };
 
   return (

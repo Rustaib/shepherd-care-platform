@@ -16,6 +16,7 @@ const schema = z.object({
   brand_primary: hex,
   brand_secondary: hex,
   brand_accent: hex,
+  app_name: z.string().trim().max(30, "App name must be 30 characters or fewer").optional(),
 });
 
 const LOGO_TYPES: Record<string, string> = { "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp" };
@@ -30,6 +31,7 @@ export async function saveSettings(_: SettingsState, formData: FormData): Promis
     ...parsed.data,
     abn: parsed.data.abn.replace(/\s/g, "") || null,
     ndis_registration_number: parsed.data.ndis_registration_number || null,
+    app_name: parsed.data.app_name || null,
   };
 
   const logo = await readUpload(formData.get("logo"));
@@ -46,6 +48,20 @@ export async function saveSettings(_: SettingsState, formData: FormData): Promis
   if (formData.get("remove_logo") === "on" && !update.logo_path) {
     if (org.logo_path) await supabase.storage.from("org-assets").remove([org.logo_path]);
     update.logo_path = null;
+  }
+
+  // Home-screen icon: a square PNG generated in the browser
+  const icon = await readUpload(formData.get("app_icon"));
+  if (icon) {
+    if (icon.type !== "image/png" || icon.size > 2 * 1024 * 1024) return { error: "The app icon must be a PNG under 2 MB." };
+    const path = `${org.id}/app-icon-${Date.now()}.png`;
+    const { error } = await supabase.storage.from("org-assets").upload(path, icon.bytes, { contentType: "image/png", upsert: false });
+    if (error) return { error: `App icon upload failed: ${error.message}` };
+    update.app_icon_path = path;
+    if (org.app_icon_path) await supabase.storage.from("org-assets").remove([org.app_icon_path]);
+  } else if (formData.get("remove_app_icon") === "on") {
+    if (org.app_icon_path) await supabase.storage.from("org-assets").remove([org.app_icon_path]);
+    update.app_icon_path = null;
   }
 
   const { error } = await supabase.from("organisations").update(update).eq("id", org.id);

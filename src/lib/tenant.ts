@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 export type HostTenant = {
   id: string; name: string; logo_path: string | null;
   brand_primary: string; brand_secondary: string; brand_accent: string;
+  app_name: string | null; app_icon_path: string | null;
 };
 
 /** Current request hostname, without port. */

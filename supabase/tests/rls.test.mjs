@@ -162,5 +162,15 @@ await db.exec("set role anon");
 expect("anon resolves org by host", (await db.query(`select name from public.org_by_host('Portal.Example.com')`)).rows[0]?.name === "Shepherd Care");
 expect("unknown host resolves nothing", (await db.query(`select * from public.org_by_host('evil.example.com')`)).rows.length === 0);
 
+// App branding
+await as(U.owner, `update organisations set app_name='Shepherd', app_icon_path='x/app-icon.png' where id='${org}'`);
+await db.exec("reset role; set role anon");
+expect("anon reads app manifest details", (await db.query(`select app_name from public.org_app_manifest('${org}')`)).rows[0]?.app_name === "Shepherd");
+expect("org_by_host returns app name", (await db.query(`select app_name from public.org_by_host('portal.example.com')`)).rows[0]?.app_name === "Shepherd");
+await throws("staff cannot change app name", async () => {
+  const r = await as(U.staff, `update organisations set app_name='Hacked' where id='${org}' returning id`);
+  if (!r.rows.length) throw new Error("no rows");
+});
+
 console.log(failures ? `\n${failures} FAILED` : "\nALL PASSED");
 process.exit(failures ? 1 : 0);
