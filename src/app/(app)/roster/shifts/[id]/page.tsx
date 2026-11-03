@@ -64,7 +64,7 @@ export default async function EditShift({ params }: { params: Promise<{ id: stri
         </section>
       )}
       <ShiftForm action={saveShift.bind(null, id)} isNew={false} locked={locked} cancelHref={`/roster?week=${week}`}
-        staff={options.staff} participants={options.participants}
+        staff={options.staff} participants={options.participants} services={options.services}
         defaults={{ ...s, date: st.date, start: st.time, end: en.time, charge_rate: s.charge_rate === null ? null : Number(s.charge_rate) }} />
       {!locked && (
         <div className="flex flex-wrap gap-2 border-t border-line pt-6">

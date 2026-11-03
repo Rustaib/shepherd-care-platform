@@ -56,6 +56,19 @@ export function ParticipantForm({ action, participant = {}, cancelHref }: {
         </div>
       </section>
 
+      <section className="card space-y-4">
+        <div>
+          <h2 className="text-lg font-semibold">Invoicing</h2>
+          <p className="text-sm text-muted">Invoices are emailed to the support coordinator, plus the plan manager for plan-managed participants. You can change recipients each time you send.</p>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Support coordinator" name="support_coordinator_name" defaultValue={v("support_coordinator_name")} />
+          <Field label="Support coordinator email" name="support_coordinator_email" type="email" defaultValue={v("support_coordinator_email")} error={e.support_coordinator_email} />
+          <Field label="Other invoice emails" name="invoice_emails" defaultValue={v("invoice_emails")} error={e.invoice_emails} className="sm:col-span-2"
+            hint="Optional, separated by commas — e.g. a family member who pays" />
+        </div>
+      </section>
+
       <section className="card space-y-2">
         <h2 className="text-lg font-semibold">Support notes</h2>
         <p className="text-sm text-muted">What support workers need to know: communication, routines, risks, likes and dislikes. Shown to staff rostered with this participant.</p>

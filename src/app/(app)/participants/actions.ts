@@ -25,6 +25,9 @@ const participantSchema = z.object({
   emergency_contact_phone: opt,
   emergency_contact_relationship: opt,
   support_notes: opt,
+  support_coordinator_name: opt,
+  support_coordinator_email: z.string().trim().refine((v) => v === "" || z.email().safeParse(v).success, "Invalid email").transform((v) => v || null),
+  invoice_emails: z.string().trim().refine((v) => v === "" || v.split(/[,;\s]+/).filter(Boolean).every((e) => z.email().safeParse(e).success), "Check the extra invoice emails").transform((v) => v || null),
 });
 
 type ParsedParticipant = z.infer<typeof participantSchema>;

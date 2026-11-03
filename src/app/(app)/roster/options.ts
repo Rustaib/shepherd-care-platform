@@ -5,17 +5,19 @@ import { todayIn } from "@/lib/time";
 
 export type StaffOption = { id: string; name: string };
 export type ParticipantOption = { id: string; name: string; address: string; budgets: { id: string; label: string }[] };
+export type ServiceOption = { id: string; name: string };
 
 /** Staff and participants for roster forms and filters. */
 export async function getRosterOptions(orgId: string, tz: string) {
   const { supabase } = await requireUser();
   const today = todayIn(tz);
-  const [{ data: members }, { data: participants }] = await Promise.all([
+  const [{ data: members }, { data: participants }, { data: services }] = await Promise.all([
     supabase.from("org_members").select("user_id, profile:profiles(full_name,email)")
       .eq("organisation_id", orgId).eq("status", "active"),
     supabase.from("participants")
       .select("id,first_name,last_name,preferred_name,address_line1,suburb,ndis_plans(start_date,end_date,status,plan_budgets(id,category))")
       .eq("organisation_id", orgId).eq("status", "active").order("last_name"),
+    supabase.from("services").select("id,name,category_label").eq("organisation_id", orgId).eq("active", true).order("sort_order").order("name"),
   ]);
 
   const staff: StaffOption[] = ((members ?? []) as unknown as { user_id: string; profile: { full_name: string; email: string } }[])
@@ -33,5 +35,6 @@ export async function getRosterOptions(orgId: string, tz: string) {
       budgets: (plan?.plan_budgets ?? []).map((b) => ({ id: b.id, label: categoryLabel(b.category) })),
     };
   });
-  return { staff, participants: people };
+  const serviceOptions: ServiceOption[] = (services ?? []).map((s) => ({ id: s.id, name: s.category_label ? `${s.category_label} ${s.name}` : s.name }));
+  return { staff, participants: people, services: serviceOptions };
 }

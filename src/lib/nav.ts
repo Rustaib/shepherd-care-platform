@@ -1,6 +1,6 @@
 import type { Role } from "@/lib/org";
 
-export type IconName = "home" | "calendar" | "person" | "users" | "settings" | "clock" | "receipt" | "alert" | "check" | "download" | "sun" | "card" | "more";
+export type IconName = "file" | "tag" | "home" | "calendar" | "person" | "users" | "settings" | "clock" | "receipt" | "alert" | "check" | "download" | "sun" | "card" | "more";
 export type NavItem = { href: string; label: string; icon: IconName; primary?: boolean; badge?: number; section?: string };
 
 /** Navigation for a role. `primary` items appear in the phone tab bar. */
@@ -22,6 +22,7 @@ export function buildNav(role: Role, counts: { approvals?: number; incidents?: n
     { href: "/participants", label: "Participants", icon: "person", primary: true },
     { href: "/approvals", label: "Approvals", icon: "check", primary: true, badge: counts.approvals },
     { href: "/incidents", label: "Incidents", icon: "alert", badge: counts.incidents },
+    { href: "/invoices", label: "Invoices", icon: "file" },
     { href: "/admin/exports", label: "Payroll export", icon: "download" },
     { href: "/admin/staff", label: "Staff", icon: "users" },
     { href: "/shifts", label: "My shifts", icon: "clock", section: "Me" },
@@ -30,6 +31,8 @@ export function buildNav(role: Role, counts: { approvals?: number; incidents?: n
   ];
   if (admin) {
     items.push(
+      { href: "/admin/services", label: "Services & prices", icon: "tag", section: "Admin" },
+      { href: "/admin/invoice-template", label: "Invoice template", icon: "file", section: "Admin" },
       { href: "/admin/holidays", label: "Public holidays", icon: "sun", section: "Admin" },
       { href: "/admin/billing", label: "Billing", icon: "card", section: "Admin" },
       { href: "/admin/settings", label: "Settings", icon: "settings", section: "Admin" },

@@ -20,6 +20,7 @@ installable PWA for iPhone and Android.
 | Reminders | Email + push notification the evening before each shift (default 6pm local), listing appointments during the shift |
 | Incidents | NDIS Commission reportable categories with 24-hour / 5-business-day deadlines, manager alerts, review workflow, incident register |
 | Approvals & payroll | Approve/reject extra hours, expenses and km; payroll export (screen + CSV) split into weekday / weekday evening / weekday night / Saturday / Sunday / public holiday hours, plus km and expenses; public holiday calendar per state |
+| Invoicing | Services & prices (NDIS item + rate per time of day), invoices per participant per period from worked shifts + approved km, PDF (customisable template), email with editable recipients/subject/message, statuses Generated → Sent → Paid (+ void), double-billing protection, exports: NDIA bulk claim, QuickBooks, QuickBooks Online, Xero, MYOB AccountRight |
 | SaaS | Custom domains per organisation, self-serve signup, 30-day trial, Stripe subscription billing, setup checklist |
 
 ## Local setup

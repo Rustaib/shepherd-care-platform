@@ -2,6 +2,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import { linesForShift, type Service } from "@/lib/invoice-lines";
 import { requireManager, requireUser } from "@/lib/org";
 import { addDaysLocal, dayLabel, isValidDate, isValidTime, localRangeUtc, shiftBounds, utcToLocal } from "@/lib/time";
 
@@ -18,6 +19,7 @@ const schema = z.object({
   location: z.string().trim().transform((v) => v || null),
   instructions: z.string().trim().transform((v) => v || null),
   plan_budget_id: uuidOrNull,
+  service_id: uuidOrNull.optional().transform((v) => v ?? null),
   support_item_code: z.string().trim().transform((v) => v || null),
   charge_rate: z.string().trim().transform((v) => (v ? Number(v.replace(/[$,]/g, "")) : null))
     .refine((v) => v === null || (Number.isFinite(v) && v >= 0), "Invalid rate"),
@@ -27,6 +29,26 @@ const schema = z.object({
 
 const CLASH_MSG = "That worker is already booked at an overlapping time.";
 const friendly = (e: { code?: string; message: string }) => (e.code === "23P01" ? CLASH_MSG : e.message);
+
+/** Blended $/hour from the shift's service and time of day, for budget tracking. */
+async function rateEstimator(supabase: Supa, org: { id: string; timezone: string; state: string }, serviceId: string | null) {
+  if (!serviceId) return () => null;
+  const [{ data: service }, { data: hols }] = await Promise.all([
+    supabase.from("services").select("*").eq("id", serviceId).maybeSingle(),
+    supabase.from("public_holidays").select("holiday_date").eq("state", org.state).or(`organisation_id.is.null,organisation_id.eq.${org.id}`),
+  ]);
+  if (!service) return () => null;
+  const holidays = new Set((hols ?? []).map((h) => h.holiday_date as string));
+  return (starts_at: string, ends_at: string, break_minutes: number) => {
+    const { lines } = linesForShift(
+      { id: "est", starts_at, ends_at, break_minutes, extra_minutes: 0, km: 0, support_item_code: null, charge_rate: null, service: service as Service },
+      { tz: org.timezone, holidays, participantName: "", lineFormat: "", kmRate: 0 },
+    );
+    const hours = lines.reduce((t, l) => t + (l.unit === "Hours" ? l.quantity : 0), 0);
+    const amount = lines.reduce((t, l) => t + l.amount, 0);
+    return hours > 0 ? Math.round((amount / hours) * 100) / 100 : lines.length ? amount : null;
+  };
+}
 
 type Supa = Awaited<ReturnType<typeof requireUser>>["supabase"];
 
@@ -53,6 +75,7 @@ export async function saveShift(shiftId: string | null, _: ShiftState, formData:
   if (d.start === d.end) return { error: "Start and end can't be the same.", fieldErrors: { end: "Same as start" } };
 
   const weeks = shiftId ? 0 : d.repeat_weeks;
+  const estimate = await rateEstimator(supabase, org, d.service_id);
   const rows = [];
   for (let w = 0; w <= weeks; w++) {
     const date = addDaysLocal(d.date, w * 7);
@@ -74,6 +97,8 @@ export async function saveShift(shiftId: string | null, _: ShiftState, formData:
       location: d.location,
       instructions: d.instructions,
       plan_budget_id: d.plan_budget_id,
+      service_id: d.service_id,
+      estimated_rate: estimate(starts_at, ends_at, d.break_minutes),
       support_item_code: d.support_item_code,
       charge_rate: d.charge_rate,
       status: d.status,
@@ -128,7 +153,7 @@ export async function copyPreviousWeek(monday: string): Promise<{ copied: number
   const { supabase, user } = await requireUser();
   const prev = localRangeUtc(addDaysLocal(monday, -7), 7, org.timezone);
   const { data: source } = await supabase.from("shifts")
-    .select("participant_id,staff_user_id,starts_at,ends_at,break_minutes,location,instructions,plan_budget_id,support_item_code,charge_rate")
+    .select("participant_id,staff_user_id,starts_at,ends_at,break_minutes,location,instructions,plan_budget_id,support_item_code,charge_rate,service_id,estimated_rate")
     .eq("organisation_id", org.id).neq("status", "cancelled").gte("starts_at", prev.start).lt("starts_at", prev.end);
 
   let copied = 0, skipped = 0;

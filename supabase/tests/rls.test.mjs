@@ -188,5 +188,34 @@ await as(U.staff, `select public.set_my_notifications('${org}', false, true, tru
 expect("member can set own notification preferences", (await as(U.staff, `select notify_progress_notes from org_members where user_id='${U.staff}'`)).rows[0].notify_progress_notes === false);
 await throws("cannot set preferences for an org you're not in", () => as(U.other, `select public.set_my_notifications('${org}', true, true, true, true)`));
 
+// Invoicing
+const svc1 = (await as(U.owner, `insert into services (organisation_id,name,weekday_code,weekday_rate) values ('${org}','Self care','01_011_0107_1_1',73.58) returning id`)).rows[0].id;
+expect("staff can read the price list", (await as(U.staff, `select count(*)::int n from services`)).rows[0].n === 1);
+await throws("staff cannot edit the price list", async () => {
+  const r = await as(U.staff, `update services set weekday_rate = 1 where id='${svc1}' returning id`);
+  if (!r.rows.length) throw new Error("no rows");
+});
+const firstNo = (await as(U.owner, `select public.allocate_invoice_numbers('${org}', 2) n`)).rows[0].n;
+const nextNo = (await as(U.owner, `select public.allocate_invoice_numbers('${org}', 1) n`)).rows[0].n;
+expect("invoice numbers allocate sequentially", Number(nextNo) === Number(firstNo) + 2);
+await throws("staff cannot allocate invoice numbers", () => as(U.staff, `select public.allocate_invoice_numbers('${org}', 1)`));
+const inv1 = (await as(U.owner, `insert into invoices (organisation_id,participant_id,invoice_number,period_start,period_end,issue_date,due_date)
+  values ('${org}','${p1}','${firstNo}', current_date - 7, current_date, current_date, current_date + 7) returning id`)).rows[0].id;
+await as(U.owner, `insert into invoice_lines (invoice_id,organisation_id,kind,shift_id,service_date,description,quantity,unit_price,amount)
+  values ('${inv1}','${org}','service','${s1}',current_date,'x',2,73.58,147.16)`);
+const inv2 = (await as(U.owner, `insert into invoices (organisation_id,participant_id,invoice_number,period_start,period_end,issue_date,due_date)
+  values ('${org}','${p1}','${Number(firstNo) + 1}', current_date - 7, current_date, current_date, current_date + 7) returning id`)).rows[0].id;
+await throws("a shift can't be billed on two invoices", () => as(U.owner, `insert into invoice_lines (invoice_id,organisation_id,kind,shift_id,service_date,description,quantity,unit_price,amount)
+  values ('${inv2}','${org}','service','${s1}',current_date,'x',2,73.58,147.16)`));
+await as(U.owner, `insert into invoice_lines (invoice_id,organisation_id,kind,shift_id,service_date,description,quantity,unit_price,amount)
+  values ('${inv2}','${org}','travel','${s1}',current_date,'km',10,0.99,9.9)`);
+expect("travel for the same shift is a separate line kind", true);
+await as(U.owner, `update invoices set status='void' where id='${inv1}'`);
+await as(U.owner, `insert into invoice_lines (invoice_id,organisation_id,kind,shift_id,service_date,description,quantity,unit_price,amount)
+  values ('${inv2}','${org}','service','${s1}',current_date,'x',2,73.58,147.16)`);
+expect("voiding an invoice frees its shifts", true);
+expect("staff cannot see invoices", (await as(U.staff, `select count(*)::int n from invoices`)).rows[0].n === 0);
+expect("other org cannot see invoices", (await as(U.other, `select count(*)::int n from invoices`)).rows[0].n === 0);
+
 console.log(failures ? `\n${failures} FAILED` : "\nALL PASSED");
 process.exit(failures ? 1 : 0);

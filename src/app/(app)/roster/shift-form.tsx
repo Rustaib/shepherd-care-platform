@@ -3,17 +3,17 @@ import Link from "next/link";
 import { useActionState, useState } from "react";
 import { Field } from "@/components/field";
 import type { ShiftState } from "./actions";
-import type { ParticipantOption, StaffOption } from "./options";
+import type { ParticipantOption, ServiceOption, StaffOption } from "./options";
 
 export type ShiftDefaults = {
   participant_id?: string | null; staff_user_id?: string | null; date?: string; start?: string; end?: string;
   break_minutes?: number; location?: string | null; instructions?: string | null; plan_budget_id?: string | null;
-  support_item_code?: string | null; charge_rate?: number | null; status?: string;
+  support_item_code?: string | null; charge_rate?: number | null; status?: string; service_id?: string | null;
 };
 
-export function ShiftForm({ action, defaults, staff, participants, isNew, cancelHref, locked }: {
+export function ShiftForm({ action, defaults, staff, participants, services, isNew, cancelHref, locked }: {
   action: (s: ShiftState, f: FormData) => Promise<ShiftState>;
-  defaults: ShiftDefaults; staff: StaffOption[]; participants: ParticipantOption[];
+  defaults: ShiftDefaults; staff: StaffOption[]; participants: ParticipantOption[]; services: ServiceOption[];
   isNew: boolean; cancelHref: string; locked?: boolean;
 }) {
   const [state, formAction, pending] = useActionState(action, undefined);
@@ -84,16 +84,31 @@ export function ShiftForm({ action, defaults, staff, participants, isNew, cancel
 
       <section className="card space-y-4">
         <h2 className="text-lg font-semibold">Billing</h2>
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Service" name="service_id" hint={services.length ? "Sets the NDIS item and rate by time of day" : undefined}>
+            <select id="service_id" name="service_id" className="field" defaultValue={defaults.service_id ?? ""}>
+              <option value="">— Choose a service —</option>
+              {services.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+            </select>
+          </Field>
           <Field label="Budget" name="plan_budget_id" hint={participant && !participant.budgets.length ? "No budgets on the current plan" : undefined}>
             <select id="plan_budget_id" name="plan_budget_id" className="field" defaultValue={defaults.plan_budget_id ?? ""} key={participantId}>
               <option value="">— Not billed to a budget —</option>
               {participant?.budgets.map((b) => <option key={b.id} value={b.id}>{b.label}</option>)}
             </select>
           </Field>
-          <Field label="NDIS support item" name="support_item_code" defaultValue={defaults.support_item_code ?? ""} placeholder="e.g. 01_011_0107_1_1" />
-          <Field label="Rate ($/hour)" name="charge_rate" inputMode="decimal" defaultValue={defaults.charge_rate ?? ""} error={e.charge_rate} />
         </div>
+        {!services.length && (
+          <p className="text-sm text-muted">No services yet — <Link href="/admin/services" className="text-brand underline">set up Services &amp; prices</Link> so shifts can be invoiced automatically.</p>
+        )}
+        <details className="rounded-xl border border-line p-3 text-sm" open={!!(defaults.support_item_code || defaults.charge_rate)}>
+          <summary className="cursor-pointer font-medium">Override the price for this shift</summary>
+          <p className="mt-2 text-muted">Bills the whole shift as one item at this rate instead of using the service&apos;s time-of-day prices.</p>
+          <div className="mt-3 grid gap-4 sm:grid-cols-2">
+            <Field label="NDIS support item" name="support_item_code" defaultValue={defaults.support_item_code ?? ""} placeholder="e.g. 01_011_0107_1_1" />
+            <Field label="Rate ($/hour)" name="charge_rate" inputMode="decimal" defaultValue={defaults.charge_rate ?? ""} error={e.charge_rate} />
+          </div>
+        </details>
       </section>
 
       <section className="card space-y-3">
