@@ -3,6 +3,9 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requireManager, requireUser } from "@/lib/org";
+import { parsePriceBook } from "@/lib/price-guide";
+import { defaultPriceGuide, upsertServices, type ImportSummary } from "@/lib/services-import";
+import { todayIn } from "@/lib/time";
 
 export type ServiceState = { error?: string } | undefined;
 
@@ -15,6 +18,7 @@ const schema = z.object({
   category_label: z.string().trim().max(10).transform((v) => v || null),
   unit: z.enum(["Hours", "Each"]),
   travel_code: code,
+  travel_rate: rate,
   active: z.string().optional().transform((v) => v === "on"),
   ...Object.fromEntries(BANDS.flatMap((b) => [[`${b}_code`, code], [`${b}_rate`, rate]])),
 });
@@ -33,34 +37,34 @@ export async function saveService(id: string | null, _: ServiceState, formData: 
   redirect("/admin/services");
 }
 
-/** Common NDIS supports to start from. Codes and rates come from a provider's
- *  current invoices; blanks must be filled from the NDIS Pricing Arrangements. */
-export async function addStandardServices() {
+export type ImportState = { ok?: string; error?: string; notes?: string[] } | undefined;
+
+const describeSummary = (r: ImportSummary) =>
+  [r.created && `${r.created} added`, r.updated && `${r.updated} updated`, r.unchanged && `${r.unchanged} left as they were`].filter(Boolean).join(", ") || "Nothing to change";
+
+/** Load the built-in NDIS price guide: adds missing services and brings existing ones up to the current prices. */
+export async function loadPriceGuide(onlyNew: boolean, _: ImportState): Promise<ImportState> {
   const { organisation: org } = await requireManager();
   const { supabase } = await requireUser();
-  const rows = [
-    {
-      name: "Assistance With Self Care Activities Standard", category_label: "01", unit: "Hours", sort_order: 1,
-      weekday_code: "01_011_0107_1_1", weekday_rate: 73.58, evening_code: "01_015_0107_1_1", evening_rate: 81.07,
-      night_code: "01_002_0107_1_1", night_rate: null, saturday_code: "01_013_0107_1_1", saturday_rate: 103.54,
-      sunday_code: "01_014_0107_1_1", sunday_rate: 133.5, public_holiday_code: "01_012_0107_1_1", public_holiday_rate: null,
-      travel_code: "01_799_0107_1_1",
-    },
-    {
-      name: "Access Community Social And Rec Activ Standard", category_label: "04", unit: "Hours", sort_order: 2,
-      weekday_code: "04_104_0125_6_1", weekday_rate: 73.58, evening_code: "04_103_0125_6_1", evening_rate: 81.07,
-      night_code: null, night_rate: null, saturday_code: null, saturday_rate: null,
-      sunday_code: "04_106_0125_6_1", sunday_rate: 133.5, public_holiday_code: null, public_holiday_rate: null,
-      travel_code: "04_799_0125_6_1",
-    },
-    {
-      name: "House Cleaning And Other Household Activities", category_label: "01", unit: "Hours", sort_order: 3,
-      ...Object.fromEntries(BANDS.flatMap((b) => [[`${b}_code`, "01_020_0120_1_1"], [`${b}_rate`, 60.1]])),
-      travel_code: null,
-    },
-  ].map((r) => ({ ...r, organisation_id: org.id }));
-  await supabase.from("services").upsert(rows, { onConflict: "organisation_id,name", ignoreDuplicates: true });
+  const r = await upsertServices(supabase, org.id, defaultPriceGuide(todayIn(org.timezone)), onlyNew);
   revalidatePath("/admin/services");
+  return r.errors.length ? { error: r.errors[0] } : { ok: `NDIS price guide loaded: ${describeSummary(r)}.` };
+}
+
+/** Import a price book CSV (same layout as the template): creates new services and overrides matching ones. */
+export async function importServices(_: ImportState, formData: FormData): Promise<ImportState> {
+  const { organisation: org } = await requireManager();
+  const { supabase } = await requireUser();
+  const file = formData.get("file");
+  if (!file || typeof file === "string" || typeof (file as Blob).text !== "function" || (file as Blob).size === 0) return { error: "Choose a CSV file to import." };
+  if ((file as Blob).size > 2_000_000) return { error: "That file is over 2 MB — is it the right one?" };
+  const text = await (file as Blob).text();
+  const { services, errors } = parsePriceBook(text, todayIn(org.timezone));
+  if (!services.length) return { error: errors[0] ?? "No services found in that file.", notes: errors.slice(1, 10) };
+  const r = await upsertServices(supabase, org.id, services, formData.get("only_new") === "on");
+  revalidatePath("/admin/services");
+  const notes = [...errors, ...r.errors];
+  return { ok: `Imported ${services.length} service${services.length === 1 ? "" : "s"}: ${describeSummary(r)}.`, notes: notes.slice(0, 10).concat(notes.length > 10 ? [`…and ${notes.length - 10} more`] : []) };
 }
 
 export async function deleteService(id: string) {

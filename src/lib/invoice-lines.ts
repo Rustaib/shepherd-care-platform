@@ -11,6 +11,7 @@ export type Service = {
   sunday_code: string | null; sunday_rate: number | null;
   public_holiday_code: string | null; public_holiday_rate: number | null;
   travel_code: string | null;
+  travel_rate?: number | null;     // per-service km rate; falls back to the invoice template's
 };
 
 export type BillableShift = {
@@ -107,10 +108,11 @@ export function linesForShift(shift: BillableShift, o: LineOptions): { lines: Li
     if (!code) problems.push(`${base.date}: ${shift.km} km not billed — the service has no travel item code`);
     else {
       const km = round2(shift.km);
+      const kmRate = svc?.travel_rate != null ? Number(svc.travel_rate) : o.kmRate;
       lines.push({
         kind: "travel", shift_id: shift.id, service_date: date,
-        description: `${describe(o.lineFormat, { ...base, service: serviceName, code, hours: "" })} ${km}km $${o.kmRate.toFixed(2)}/km`,
-        support_item_code: code, unit: "km", quantity: km, unit_price: o.kmRate, tax: 0, amount: round2(km * o.kmRate),
+        description: `${describe(o.lineFormat, { ...base, service: serviceName, code, hours: "" })} ${km}km $${kmRate.toFixed(2)}/km`,
+        support_item_code: code, unit: "km", quantity: km, unit_price: kmRate, tax: 0, amount: round2(km * kmRate),
       });
     }
   }

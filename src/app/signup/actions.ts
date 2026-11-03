@@ -1,4 +1,6 @@
 "use server";
+import { defaultPriceGuide, upsertServices } from "@/lib/services-import";
+import { todayIn } from "@/lib/time";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
@@ -32,6 +34,8 @@ export async function createOrganisation(_: FormState, formData: FormData): Prom
     p_name: parsed.data.name, p_slug: slug, p_state: parsed.data.state,
   });
   if (error) return { error: error.message };
+  // Start every new organisation with the NDIS price guide (best effort; they can load it later)
+  try { await upsertServices(supabase, orgId as string, defaultPriceGuide(todayIn("Australia/Sydney"))); } catch { /* ignore */ }
 
   (await cookies()).set(ORG_COOKIE, orgId as string, { path: "/", httpOnly: true, sameSite: "lax", maxAge: 60 * 60 * 24 * 365 });
   redirect("/admin/settings");

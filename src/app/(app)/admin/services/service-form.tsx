@@ -45,9 +45,9 @@ export function ServiceForm({ action, service }: { action: (s: ServiceState, f: 
                 </tr>
               ))}
               <tr className="border-t border-line">
-                <td className="py-2 pr-3"><div className="font-medium">Provider travel</div><div className="text-xs text-muted">Approved km × your km rate</div></td>
+                <td className="py-2 pr-3"><div className="font-medium">Provider travel</div><div className="text-xs text-muted">Approved km × rate per km</div></td>
                 <td className="py-2 pr-3"><input name="travel_code" aria-label="Travel item code" className="field font-mono" defaultValue={v("travel_code")} placeholder="e.g. 01_799_0107_1_1" /></td>
-                <td className="py-2 text-xs text-muted">Set in Invoice template</td>
+                <td className="py-2"><input name="travel_rate" aria-label="Rate per km" inputMode="decimal" className="field w-32 text-right tabular-nums" defaultValue={v("travel_rate")} placeholder="Template rate" /></td>
               </tr>
             </tbody>
           </table>
