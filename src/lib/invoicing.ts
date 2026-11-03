@@ -2,7 +2,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { addDays, format, parseISO } from "date-fns";
 import { renderInvoicePdf } from "@/lib/invoice-pdf";
-import { linesForShift, totals, type Line, type Service } from "@/lib/invoice-lines";
+import { linesForCharge, linesForShift, totals, type BulkCharge, type Line, type Service } from "@/lib/invoice-lines";
 import { assetUrl, type Organisation } from "@/lib/org";
 import { localRangeUtc, todayIn } from "@/lib/time";
 
@@ -88,7 +88,7 @@ export async function billableFor(
   const { start, end } = localRangeUtc(from, days, org.timezone);
   const now = new Date().toISOString();
 
-  const [{ data: people }, { data: shifts }, { data: holidays }, { data: overlaps }] = await Promise.all([
+  const [{ data: people }, { data: shifts }, { data: holidays }, { data: overlaps }, { data: charges }] = await Promise.all([
     supabase.from("participants")
       .select("id,first_name,last_name,ndis_number,email,phone,address_line1,address_line2,suburb,state,postcode,support_coordinator_name,support_coordinator_email,invoice_emails,ndis_plans(start_date,end_date,status,management_type,plan_manager_name,plan_manager_email)")
       .eq("organisation_id", org.id).in("id", participantIds),
@@ -102,7 +102,12 @@ export async function billableFor(
     supabase.from("invoices").select("id,participant_id,invoice_number,status,period_start,period_end")
       .eq("organisation_id", org.id).in("participant_id", participantIds).neq("status", "void")
       .lte("period_start", to).gte("period_end", from),
+    supabase.from("participant_charges")
+      .select("id,participant_id,frequency,amount,description,support_item_code,start_date,end_date,service:services(name,category_label,weekday_code)")
+      .eq("organisation_id", org.id).in("participant_id", participantIds)
+      .lte("start_date", to).or(`end_date.is.null,end_date.gte.${from}`),
   ]);
+  const chargeRows = ((charges ?? []) as unknown as (BulkCharge & { participant_id: string })[]).map((c) => ({ ...c, amount: Number(c.amount) }));
 
   type S = {
     id: string; participant_id: string; starts_at: string; ends_at: string; break_minutes: number;
@@ -117,6 +122,11 @@ export async function billableFor(
     const { data } = await supabase.from("invoice_lines").select("shift_id,kind,invoice:invoices!inner(status)")
       .in("shift_id", shiftRows.map((s) => s.id)).neq("invoice.status", "void");
     for (const l of data ?? []) billed.add(`${l.shift_id}:${l.kind}`);
+  }
+  if (!opts.includeInvoiced && chargeRows.length) {
+    const { data } = await supabase.from("invoice_lines").select("charge_id,period_start,invoice:invoices!inner(status)")
+      .in("charge_id", chargeRows.map((c) => c.id)).neq("invoice.status", "void");
+    for (const l of data ?? []) billed.add(`charge:${l.charge_id}:${l.period_start}`);
   }
 
   const holidaySet = new Set((holidays ?? []).map((h) => h.holiday_date as string));
@@ -136,6 +146,15 @@ export async function billableFor(
       }
       problems.push(...res.problems);
     }
+    for (const c of chargeRows.filter((x) => x.participant_id === p.id)) {
+      const res = linesForCharge(c, from, to, b.name);
+      for (const l of res.lines) {
+        if (billed.has(`charge:${l.charge_id}:${l.period_start}`)) { alreadyBilled++; continue; }
+        lines.push(l);
+      }
+      problems.push(...res.problems);
+    }
+    lines.sort((a, b) => a.service_date.localeCompare(b.service_date) || (a.kind === "charge" ? 0 : 1) - (b.kind === "charge" ? 0 : 1));
     return {
       participant: { id: p.id, name: b.name }, billTo: b, lines, problems, alreadyBilled,
       overlapping: (overlaps ?? []).filter((o) => o.participant_id === p.id) as ParticipantBilling["overlapping"],

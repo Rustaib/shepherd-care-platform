@@ -7,12 +7,12 @@ export const BANDS = ["weekday", "evening", "night", "saturday", "sunday", "publ
 export type Band = (typeof BANDS)[number];
 
 export type ServiceInput = {
-  name: string; category_label: string | null; unit: "Hours" | "Each";
+  name: string; category_label: string | null; unit: "Hours" | "Each" | "Week" | "Month";
   travel_code: string | null; travel_rate: number | null; effective_from: string | null;
 } & Record<`${Band}_code`, string | null> & Record<`${Band}_rate`, number | null>;
 
 export const HEADER = ["Price Book Name", "Price Book External ID", "Day Of Week", "Time Of Day", "Price", "Reference Number",
-  "Price Per Km", "Reference Number Km", "Multiplier", "Effective Date", "Fixed Price", "Provider Travel"];
+  "Price Per Km", "Reference Number Km", "Multiplier", "Effective Date", "Fixed Price", "Provider Travel", "Charged Per"];
 
 const CODE = /^[0-9]{2}_[0-9A-Z_]{3,30}$/i;
 
@@ -96,7 +96,7 @@ export function parsePriceBook(text: string, today: string): ParseResult {
   const ix = {
     name: col("Price Book Name"), ext: col("Price Book External ID"), day: col("Day Of Week"), time: col("Time Of Day"),
     price: col("Price"), code: col("Reference Number"), km: col("Price Per Km"), kmCode: col("Reference Number Km"),
-    mult: col("Multiplier"), date: col("Effective Date"), fixed: col("Fixed Price"),
+    mult: col("Multiplier"), date: col("Effective Date"), fixed: col("Fixed Price"), per: col("Charged Per"),
   };
   const missing = (["name", "day", "price", "code"] as const).filter((k) => ix[k] < 0);
   if (missing.length) {
@@ -105,7 +105,7 @@ export function parsePriceBook(text: string, today: string): ParseResult {
   const get = (r: string[], i: number) => (i >= 0 ? (r[i] ?? "").trim() : "");
 
   type Pick = { date: string; prio: number; price: number | null; code: string | null };
-  type Acc = { display: string; bands: Partial<Record<Band, Pick>>; fixed: boolean; fixedDate: string; travel: { date: string; code: string | null; rate: number | null } | null; dayRows: boolean; dates: string[] };
+  type Acc = { display: string; bands: Partial<Record<Band, Pick>>; fixed: boolean; fixedDate: string; travel: { date: string; code: string | null; rate: number | null } | null; per: string | null; dayRows: boolean; dates: string[] };
   const byKey = new Map<string, Acc>();
 
   // Rows effective today or earlier; if a service only has future rows we fall back to them below.
@@ -127,7 +127,7 @@ export function parsePriceBook(text: string, today: string): ParseResult {
 
     const key = serviceKey(full);
     let acc = byKey.get(key);
-    if (!acc) { acc = { display: full, bands: {}, fixed: false, fixedDate: "", travel: null, dayRows: false, dates: [] }; byKey.set(key, acc); }
+    if (!acc) { acc = { display: full, bands: {}, fixed: false, fixedDate: "", travel: null, dayRows: false, dates: [], per: null }; byKey.set(key, acc); }
     acc.dates.push(date);
     if (!cover.allDay && cover.bands.some((b) => b === "saturday" || b === "sunday" || b === "public_holiday")) acc.dayRows = true;
     const prio = cover.allDay ? 1 : 2;
@@ -138,6 +138,8 @@ export function parsePriceBook(text: string, today: string): ParseResult {
     if (newer({ date, prio: 0 }, acc.fixedDate ? { date: acc.fixedDate, prio: 0 } : undefined, today)) {
       acc.fixed = /^(true|yes|1)$/i.test(get(r, ix.fixed)); acc.fixedDate = date;
     }
+    const per = norm(get(r, ix.per));
+    if (["hour", "hours", "each", "shift", "week", "month"].includes(per)) acc.per = per;
     const kmCode = get(r, ix.kmCode).toUpperCase() || null;
     const km = Number(get(r, ix.km) || "0");
     if (kmCode && CODE.test(kmCode) && kmCode !== code && newer({ date, prio: 0 }, acc.travel ? { date: acc.travel.date, prio: 0 } : undefined, today)) {
@@ -148,7 +150,7 @@ export function parsePriceBook(text: string, today: string): ParseResult {
   const services: ServiceInput[] = [];
   for (const acc of byKey.values()) {
     const { category, name } = splitName(acc.display);
-    const s = { name: name.slice(0, 120), unit: acc.fixed ? "Each" : "Hours", travel_code: acc.travel?.code ?? null, travel_rate: acc.travel?.rate ?? null } as ServiceInput;
+    const s = { name: name.slice(0, 120), unit: acc.per ? ({ hour: "Hours", hours: "Hours", each: "Each", shift: "Each", week: "Week", month: "Month" } as const)[acc.per as "hour"] : !acc.fixed ? "Hours" : /\bweekly\b/i.test(name) ? "Week" : /\bmonthly\b/i.test(name) ? "Month" : "Each", travel_code: acc.travel?.code ?? null, travel_rate: acc.travel?.rate ?? null } as ServiceInput;
     for (const b of BANDS) { const p = acc.bands[b]; s[`${b}_code`] = p?.code ?? null; s[`${b}_rate`] = p?.price ?? null; }
     // A single all-day standard price with no weekend/holiday rows applies every day
     if (!acc.dayRows && acc.bands.weekday) for (const b of ["saturday", "sunday", "public_holiday"] as const) { s[`${b}_code`] = s.weekday_code; s[`${b}_rate`] = s.weekday_rate; }
@@ -187,7 +189,7 @@ export function toPriceBookCsv(services: ExportService[], today: string, default
     const rows = same ? [{ day: "Standard", time: "12 am - 12 am", ...filled[0] }] : filled.map((v) => ({ day: where[v.b][0], time: where[v.b][1], ...v }));
     if (!rows.length) rows.push({ day: "Standard", time: "6 am - 8 pm", b: "weekday", code: null, rate: null });
     for (const r of rows) {
-      out.push([full, "", r.day, r.time, r.rate ?? 0, r.code ?? "", km, s.travel_code ?? "", "1.0", date, s.unit === "Each" ? "true" : "false", "false"].map(cell).join(","));
+      out.push([full, "", r.day, r.time, r.rate ?? 0, r.code ?? "", km, s.travel_code ?? "", "1.0", date, s.unit === "Hours" ? "false" : "true", "false", s.unit].map(cell).join(","));
     }
   }
   return out.join("\r\n") + "\r\n";

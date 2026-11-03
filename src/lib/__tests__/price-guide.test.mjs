@@ -25,7 +25,7 @@ test("single all-day price applies every day", () => {
 });
 test("fixed price items, zero prices, and code from external ID", () => {
   const sil = by("Sil Support Weekly");
-  assert.equal(sil.unit, "Each"); assert.equal(sil.weekday_rate, null); assert.equal(sil.category_label, "01");
+  assert.equal(sil.unit, "Week"); assert.equal(sil.weekday_rate, null); assert.equal(sil.category_label, "01");
   const sta = by("Sta And Assistance (Inc. Respite)");
   assert.equal(sta.weekday_rate, 2178.57); assert.equal(sta.public_holiday_rate, 4270.25);
   assert.equal(by("Adult Pull Ups").weekday_code, "03_093021077_0103_1_1");
@@ -46,4 +46,9 @@ test("export round-trips through import", () => {
 test("bad files are explained", () => {
   assert.match(parsePriceBook("a,b\n1,2", "2026-11-03").errors[0], /missing column/);
   assert.deepEqual(parseCsv('"a,""b""",c\r\n'), [['a,"b"', "c"]]);
+});
+test("weekly SIL is a bulk weekly service and round-trips", () => {
+  assert.equal(by("Sil Support Weekly").unit, "Week");
+  const csv = toPriceBookCsv([{ ...by("Sil Support Weekly"), name: "Supported living" }], "2026-11-03", 1);
+  assert.equal(parsePriceBook(csv, "2026-11-03").services[0].unit, "Week");
 });

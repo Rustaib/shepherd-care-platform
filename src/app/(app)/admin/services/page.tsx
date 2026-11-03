@@ -30,7 +30,7 @@ export default async function Services() {
             <tbody className="divide-y divide-line">
               {services.map((s) => (
                 <tr key={s.id} className={s.active ? "" : "opacity-50"}>
-                  <td className="p-3"><Link href={`/admin/services/${s.id}`} className="font-medium text-brand underline">{s.category_label ? `${s.category_label} ` : ""}{s.name}</Link>{!s.active && <span className="ml-2 badge">Hidden</span>}<div className="text-xs text-muted">{s.unit === "Each" ? "Fixed price" : "Per hour"}{s.effective_from ? ` · from ${s.effective_from.split("-").reverse().join("/")}` : ""}</div></td>
+                  <td className="p-3"><Link href={`/admin/services/${s.id}`} className="font-medium text-brand underline">{s.category_label ? `${s.category_label} ` : ""}{s.name}</Link>{!s.active && <span className="ml-2 badge">Hidden</span>}<div className="text-xs text-muted">{({ Each: "Fixed price per shift", Week: "Bulk per week", Month: "Bulk per month" } as Record<string, string>)[s.unit] ?? "Per hour"}{s.effective_from ? ` · from ${s.effective_from.split("-").reverse().join("/")}` : ""}</div></td>
                   {BANDS.map((b) => {
                     const missing = !s[`${b}_code`] || s[`${b}_rate`] == null;
                     return <td key={b} className={`p-3 text-right tabular-nums ${missing ? "text-danger" : ""}`} title={s[`${b}_code`] ?? "No item code"}>{s[`${b}_rate`] != null ? money(s[`${b}_rate`]) : "—"}</td>;

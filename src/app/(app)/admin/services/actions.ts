@@ -16,7 +16,7 @@ const rate = z.string().trim().transform((v) => v.replace(/[$,]/g, "")).refine((
 const schema = z.object({
   name: z.string().trim().min(2, "Name the service").max(120),
   category_label: z.string().trim().max(10).transform((v) => v || null),
-  unit: z.enum(["Hours", "Each"]),
+  unit: z.enum(["Hours", "Each", "Week", "Month"]),
   travel_code: code,
   travel_rate: rate,
   active: z.string().optional().transform((v) => v === "on"),

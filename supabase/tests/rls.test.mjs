@@ -217,5 +217,23 @@ expect("voiding an invoice frees its shifts", true);
 expect("staff cannot see invoices", (await as(U.staff, `select count(*)::int n from invoices`)).rows[0].n === 0);
 expect("other org cannot see invoices", (await as(U.other, `select count(*)::int n from invoices`)).rows[0].n === 0);
 
+// Bulk (SIL) charges
+await as(U.owner, `insert into services (organisation_id,name,unit,weekday_code,weekday_rate) values ('${org}','Sil Support Weekly','Week','01_821_0115_1_1',5877.72)`);
+await throws("unknown service unit rejected", () => as(U.owner, `insert into services (organisation_id,name,unit) values ('${org}','Bad','Fortnight')`));
+const ch = (await as(U.owner, `insert into participant_charges (organisation_id,participant_id,frequency,amount,support_item_code,start_date)
+  values ('${org}','${p1}','week',5877.72,'01_821_0115_1_1','2026-10-05') returning id`)).rows[0].id;
+await throws("staff cannot create charges", () => as(U.staff, `insert into participant_charges (organisation_id,participant_id,frequency,amount,start_date) values ('${org}','${p1}','week',1,'2026-10-05')`));
+expect("staff cannot see charges", (await as(U.staff, `select count(*)::int n from participant_charges`)).rows[0].n === 0);
+expect("other org cannot see charges", (await as(U.other, `select count(*)::int n from participant_charges`)).rows[0].n === 0);
+await as(U.owner, `insert into invoice_lines (invoice_id,organisation_id,kind,charge_id,period_start,period_end,service_date,description,unit,quantity,unit_price,amount)
+  values ('${inv2}','${org}','charge','${ch}','2026-10-05','2026-10-11','2026-10-05','SIL','Week',1,5877.72,5877.72)`);
+const inv3 = (await as(U.owner, `insert into invoices (organisation_id,participant_id,invoice_number,period_start,period_end,issue_date,due_date)
+  values ('${org}','${p1}','SIL-3','2026-10-01','2026-10-31', current_date, current_date + 7) returning id`)).rows[0].id;
+await throws("a week of a bulk charge can't be billed twice", () => as(U.owner, `insert into invoice_lines (invoice_id,organisation_id,kind,charge_id,period_start,period_end,service_date,description,unit,quantity,unit_price,amount)
+  values ('${inv3}','${org}','charge','${ch}','2026-10-05','2026-10-11','2026-10-05','SIL','Week',1,5877.72,5877.72)`));
+await as(U.owner, `insert into invoice_lines (invoice_id,organisation_id,kind,charge_id,period_start,period_end,service_date,description,unit,quantity,unit_price,amount)
+  values ('${inv3}','${org}','charge','${ch}','2026-10-12','2026-10-18','2026-10-12','SIL','Week',1,5877.72,5877.72)`);
+expect("the next week bills fine", true);
+
 console.log(failures ? `\n${failures} FAILED` : "\nALL PASSED");
 process.exit(failures ? 1 : 0);

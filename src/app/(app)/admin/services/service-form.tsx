@@ -24,7 +24,7 @@ export function ServiceForm({ action, service }: { action: (s: ServiceState, f: 
           <div><label htmlFor="category_label" className="label">Category</label><input id="category_label" name="category_label" className="field" defaultValue={v("category_label")} placeholder="01" /></div>
           <div><label htmlFor="name" className="label">Service name *</label><input id="name" name="name" className="field" defaultValue={v("name")} placeholder="Assistance With Self Care Activities Standard" required /></div>
           <div><label htmlFor="unit" className="label">Charged per</label>
-            <select id="unit" name="unit" className="field" defaultValue={v("unit") || "Hours"}><option value="Hours">Hour</option><option value="Each">Shift (fixed)</option></select>
+            <select id="unit" name="unit" className="field" defaultValue={v("unit") || "Hours"}><option value="Hours">Hour</option><option value="Each">Shift (fixed)</option><option value="Week">Week (bulk, e.g. SIL)</option><option value="Month">Month (bulk, e.g. SIL)</option></select>
           </div>
         </div>
         <p className="text-xs text-muted">Shown on invoice lines as &quot;[{v("category_label") || "01"} {v("name") || "Service name"}]&quot;.</p>
@@ -32,7 +32,7 @@ export function ServiceForm({ action, service }: { action: (s: ServiceState, f: 
 
       <section className="card space-y-3">
         <h2 className="font-semibold">NDIS items and rates</h2>
-        <p className="text-sm text-muted">Hours are split by time of day the same way as payroll. Check codes and price limits against the current NDIS Pricing Arrangements. A fixed-price service uses the weekday row only.</p>
+        <p className="text-sm text-muted">Hours are split by time of day the same way as payroll. Check codes and price limits against the current NDIS Pricing Arrangements. A fixed-price service uses the weekday row only. A weekly or monthly service is billed through each participant&apos;s bulk charge (set on the participant), not per shift — the weekday row is its item code and default amount.</p>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[560px] text-sm">
             <thead className="text-left text-xs uppercase tracking-wide text-muted"><tr><th className="py-2">When</th><th className="py-2">Support item code</th><th className="py-2">Rate ($)</th></tr></thead>

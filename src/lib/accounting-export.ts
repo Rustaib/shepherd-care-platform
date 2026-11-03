@@ -12,7 +12,8 @@ export type ExportRow = {
   issueDate: string | null;   // yyyy-MM-dd
   dueDate: string | null;
   serviceDate: string;        // yyyy-MM-dd
-  kind: "service" | "travel";
+  serviceDateTo?: string | null; // last day covered (bulk weekly/monthly charges)
+  kind: "service" | "travel" | "charge";
   description: string;
   code: string | null;
   unit: string;
@@ -58,7 +59,7 @@ export function toCsv(format: ExportFormat, rows: ExportRow[], s: ExportSettings
       "Quantity", "Hours", "UnitPrice", "GSTCode", "AuthorisedBy", "ParticipantApproved", "InKindFundingProgram", "ClaimType", "CancellationReason", "ABN of Support Provider"];
     return csv(header, sorted.map((r) => {
       const { qty, price } = claimQtyPrice(r);
-      return [s.ndiaRegistrationNumber ?? "", r.customer.ndis_number ?? "", r.serviceDate, r.serviceDate, r.code ?? "", r.invoiceNumber ?? "",
+      return [s.ndiaRegistrationNumber ?? "", r.customer.ndis_number ?? "", r.serviceDate, r.serviceDateTo ?? r.serviceDate, r.code ?? "", r.invoiceNumber ?? "",
         n1(qty), "", n2(price), "P2", "", "", "", "", "", (s.abn ?? "").replace(/\s/g, "")];
     }));
   }

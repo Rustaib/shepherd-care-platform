@@ -2,7 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ageFrom, categoryLabel, displayName, formatDate, MANAGEMENT_LABEL, money } from "@/lib/ndis";
 import { isManager, requireMembership, requireUser } from "@/lib/org";
-import { dayLabel, timeLabel, utcToLocal } from "@/lib/time";
+import { dayLabel, timeLabel, todayIn, utcToLocal } from "@/lib/time";
+import { BulkCharges } from "./charges/bulk-charges";
 import { setParticipantStatus } from "../actions";
 
 export const metadata = { title: "Participant" };
@@ -161,6 +162,8 @@ export default async function ParticipantPage({ params }: { params: Promise<{ id
           </ul>
         )}
       </section>
+
+      {manager && <BulkCharges participantId={id} orgId={org.id} today={todayIn(tz)} />}
 
       <section className="card space-y-5">
         <div className="flex flex-wrap items-center justify-between gap-3">

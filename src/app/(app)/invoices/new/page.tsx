@@ -70,7 +70,7 @@ export default async function NewInvoices({ searchParams }: { searchParams: Prom
                       {b.overlapping.map((o) => (
                         <div key={o.id}>Already invoiced: <Link href={`/invoices/${o.id}`} className="text-brand underline">#{o.invoice_number}</Link> ({periodLabel(o.period_start, o.period_end)}, {INVOICE_STATUS[o.status].label})</div>
                       ))}
-                      {b.alreadyBilled > 0 && <div>{b.alreadyBilled} shift line{b.alreadyBilled > 1 ? "s" : ""} skipped — already invoiced</div>}
+                      {b.alreadyBilled > 0 && <div>{b.alreadyBilled} line{b.alreadyBilled > 1 ? "s" : ""} skipped — already invoiced</div>}
                       {!b.lines.length && !b.problems.length && <div>Nothing to invoice</div>}
                       {b.problems.map((pr, i) => <div key={i} className="text-danger">⚠ {pr}</div>)}
                       {!b.billTo.support_coordinator_email && !b.billTo.plan_manager_email && b.lines.length > 0 && (
