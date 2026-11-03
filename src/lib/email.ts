@@ -58,3 +58,31 @@ export async function sendEmailWithAttachments(opts: {
     return { ok: false, error: (e as Error).message };
   }
 }
+
+/** Send up to 100 separate emails in one request (Resend batch API). Returns how many were accepted. */
+export async function sendEmailBatch(messages: { to: string; subject: string; html: string }[]): Promise<{ sent: number; error?: string }> {
+  const key = env.resendApiKey();
+  if (!key) return { sent: 0, error: "Email isn't set up on this server (RESEND_API_KEY missing)." };
+  let sent = 0;
+  for (let i = 0; i < messages.length; i += 100) {
+    const chunk = messages.slice(i, i + 100);
+    try {
+      const res = await fetch("https://api.resend.com/emails/batch", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+        body: JSON.stringify(chunk.map((m) => ({ from: env.emailFrom(), ...m }))),
+      });
+      if (!res.ok) {
+        const body = await res.text();
+        console.error(`Batch email failed (${res.status}): ${body.slice(0, 300)}`);
+        let message = body;
+        try { message = (JSON.parse(body) as { message?: string }).message ?? body; } catch { /* not JSON */ }
+        return { sent, error: message.slice(0, 300) };
+      }
+      sent += chunk.length;
+    } catch (e) {
+      return { sent, error: (e as Error).message };
+    }
+  }
+  return { sent };
+}

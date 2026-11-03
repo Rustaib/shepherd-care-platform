@@ -6,11 +6,11 @@ const sil = { name: "Sil Support Weekly", category_label: "01", weekday_code: "0
 const weekly = { id: "c1", frequency: "week", amount: 5877.72, description: "SIL", support_item_code: null, start_date: "2026-07-01", end_date: null, service: sil };
 
 test("weekly charge bills each Monday–Sunday week once", () => {
-  const { lines } = linesForCharge(weekly, "2026-10-01", "2026-10-31", "Ridge Kainz");
+  const { lines } = linesForCharge(weekly, "2026-10-01", "2026-10-31", "Riley Example");
   assert.deepEqual(lines.map((l) => [l.period_start, l.quantity, l.amount]),
     [["2026-10-05", 1, 5877.72], ["2026-10-12", 1, 5877.72], ["2026-10-19", 1, 5877.72], ["2026-10-26", 1, 5877.72]]);
   assert.equal(lines[0].unit, "Week");
-  assert.match(lines[0].description, /^Ridge Kainz – SIL 05\/10\/2026 to 11\/10\/2026 \[01 Sil Support Weekly\] \[01_821_0115_1_1\]$/);
+  assert.match(lines[0].description, /^Riley Example – SIL 05\/10\/2026 to 11\/10\/2026 \[01 Sil Support Weekly\] \[01_821_0115_1_1\]$/);
   // the week starting 28/09 belongs to September's invoice
   assert.equal(linesForCharge(weekly, "2026-09-01", "2026-09-30", "R").lines.at(-1).period_start, "2026-09-28");
 });

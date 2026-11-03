@@ -1,14 +1,17 @@
+import Link from "next/link";
 import { isAdmin, requireManager } from "@/lib/org";
 import { createClient } from "@/lib/supabase/server";
 import { revokeInvitation, setMemberRole, setMemberStatus } from "./actions";
 import { InviteForm } from "./invite-form";
+import { SendInviteButton } from "./invite-buttons";
 
 export const metadata = { title: "Staff" };
 
 const ROLE_LABEL: Record<string, string> = { owner: "Owner", admin: "Admin", coordinator: "Coordinator", staff: "Support worker" };
 
 type Member = { id: string; role: string; status: string; created_at: string; profile: { full_name: string; email: string; phone: string | null } };
-type Invite = { id: string; email: string; role: string; expires_at: string };
+type Invite = { id: string; email: string; role: string; expires_at: string; sent_at: string | null; full_name: string | null; phone: string | null; employment_type: string | null };
+const EMPLOYMENT: Record<string, string> = { casual: "Casual", part_time: "Part time", full_time: "Full time", contractor: "Contractor" };
 
 export default async function StaffPage() {
   const { role, organisation: org } = await requireManager();
@@ -19,28 +22,61 @@ export default async function StaffPage() {
     supabase.from("org_members").select("id,role,status,created_at,profile:profiles(full_name,email,phone)")
       .eq("organisation_id", org.id).order("created_at").returns<Member[]>(),
     canEdit
-      ? supabase.from("invitations").select("id,email,role,expires_at").eq("organisation_id", org.id)
+      ? supabase.from("invitations").select("id,email,role,expires_at,sent_at,full_name,phone,employment_type").eq("organisation_id", org.id)
           .is("accepted_at", null).order("created_at", { ascending: false }).returns<Invite[]>()
       : Promise.resolve({ data: [] as Invite[] }),
   ]);
 
+  const unsent = (invites ?? []).filter((i) => !i.sent_at);
+  const sent = (invites ?? []).filter((i) => i.sent_at);
+
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold tracking-tight">Staff</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-2xl font-bold tracking-tight">Staff</h1>
+        {canEdit && <Link href="/admin/staff/import" className="btn-ghost">Import from CSV</Link>}
+      </div>
       {canEdit && <InviteForm />}
 
-      {canEdit && !!invites?.length && (
+      {canEdit && !!unsent.length && (
+        <section className="card">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold">Not invited yet ({unsent.length})</h2>
+              <p className="text-sm text-muted">Imported from a file. They can&apos;t sign in or be rostered until they accept an invitation.</p>
+            </div>
+            <SendInviteButton ids="all-unsent" label={`Invite all ${unsent.length}`} primary />
+          </div>
+          <ul className="divide-y divide-line">
+            {unsent.map((i) => (
+              <li key={i.id} className="flex flex-wrap items-center gap-3 py-3">
+                <div className="min-w-0 flex-1">
+                  <div className="truncate font-medium">{i.full_name || i.email}</div>
+                  <div className="truncate text-sm text-muted">
+                    {[i.full_name ? i.email : null, i.phone, ROLE_LABEL[i.role], i.employment_type ? EMPLOYMENT[i.employment_type] : null].filter(Boolean).join(" · ")}
+                  </div>
+                </div>
+                <SendInviteButton ids={[i.id]} label="Invite" />
+                <form action={revokeInvitation.bind(null, i.id)}><button className="btn-ghost px-3 py-1.5 text-danger">Remove</button></form>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {canEdit && !!sent.length && (
         <section className="card">
           <h2 className="mb-3 text-lg font-semibold">Pending invitations</h2>
           <ul className="divide-y divide-line">
-            {invites.map((i) => {
+            {sent.map((i) => {
               const expired = new Date(i.expires_at) < new Date();
               return (
                 <li key={i.id} className="flex flex-wrap items-center gap-3 py-3">
                   <div className="min-w-0 flex-1">
-                    <div className="truncate font-medium">{i.email}</div>
-                    <div className="text-sm text-muted">{ROLE_LABEL[i.role]} · {expired ? "Expired" : `Expires ${new Date(i.expires_at).toLocaleDateString("en-AU")}`}</div>
+                    <div className="truncate font-medium">{i.full_name || i.email}</div>
+                    <div className="text-sm text-muted">{i.full_name ? `${i.email} · ` : ""}{ROLE_LABEL[i.role]} · {expired ? "Expired" : `Expires ${new Date(i.expires_at).toLocaleDateString("en-AU")}`}</div>
                   </div>
+                  <SendInviteButton ids={[i.id]} label="Resend" />
                   <form action={revokeInvitation.bind(null, i.id)}><button className="btn-ghost px-3 py-1.5 text-danger">{expired ? "Remove" : "Revoke"}</button></form>
                 </li>
               );

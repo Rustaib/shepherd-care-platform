@@ -37,7 +37,10 @@ export default async function Participants({ searchParams }: { searchParams: Pro
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold tracking-tight">Participants</h1>
-        <Link href="/participants/new" className="btn-primary">+ Add participant</Link>
+        <div className="flex flex-wrap gap-2">
+          <Link href="/participants/import" className="btn-ghost">Import from CSV</Link>
+          <Link href="/participants/new" className="btn-primary">+ Add participant</Link>
+        </div>
       </div>
 
       <form className="flex flex-col gap-3 sm:flex-row" role="search">

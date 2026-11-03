@@ -52,7 +52,7 @@ const as = async (uid, sql) => {
 const expect = (name, cond) => { console.log((cond ? "PASS " : "FAIL ") + name); if (!cond) failures++; };
 const throws = async (name, fn) => { try { await fn(); expect(name, false); } catch { expect(name, true); } };
 
-const org = (await as(U.owner, `select public.create_organisation('Shepherd Care','shepherd-care','NSW') id`)).rows[0].id;
+const org = (await as(U.owner, `select public.create_organisation('Sample Care','sample-care','NSW') id`)).rows[0].id;
 const orgB = (await as(U.other, `select public.create_organisation('Other Co','other-co','VIC') id`)).rows[0].id;
 expect("profiles auto-created", (await as(U.owner, `select count(*)::int n from profiles where id='${U.owner}'`)).rows[0].n === 1);
 
@@ -68,7 +68,7 @@ expect("invitation preview works for anon",
   (await (async()=>{ await db.exec("reset role; set role anon"); return db.query(`select * from public.invitation_preview('${tok}')`); })()).rows.length === 0);
 
 // Tenant isolation
-expect("other org cannot see Shepherd org", (await as(U.other, `select count(*)::int n from organisations where id='${org}'`)).rows[0].n === 0);
+expect("other org cannot see the first org", (await as(U.other, `select count(*)::int n from organisations where id='${org}'`)).rows[0].n === 0);
 await throws("staff cannot create participant", () => as(U.staff, `insert into participants (organisation_id,first_name,last_name) values ('${org}','X','Y')`));
 
 const p1 = (await as(U.owner, `insert into participants (organisation_id,first_name,last_name,ndis_number) values ('${org}','Jane','Citizen','430000001') returning id`)).rows[0].id;
@@ -159,7 +159,7 @@ await as(U.owner, `update organisations set brand_primary='#123456' where id='${
 expect("admin can still edit branding", (await as(U.owner, `select brand_primary from organisations where id='${org}'`)).rows[0].brand_primary === "#123456");
 await db.exec(`reset role; update organisations set custom_domain='portal.example.com', domain_status='active' where id='${org}'`);
 await db.exec("set role anon");
-expect("anon resolves org by host", (await db.query(`select name from public.org_by_host('Portal.Example.com')`)).rows[0]?.name === "Shepherd Care");
+expect("anon resolves org by host", (await db.query(`select name from public.org_by_host('Portal.Example.com')`)).rows[0]?.name === "Sample Care");
 expect("unknown host resolves nothing", (await db.query(`select * from public.org_by_host('evil.example.com')`)).rows.length === 0);
 
 // App branding
@@ -234,6 +234,18 @@ await throws("a week of a bulk charge can't be billed twice", () => as(U.owner, 
 await as(U.owner, `insert into invoice_lines (invoice_id,organisation_id,kind,charge_id,period_start,period_end,service_date,description,unit,quantity,unit_price,amount)
   values ('${inv3}','${org}','charge','${ch}','2026-10-12','2026-10-18','2026-10-12','SIL','Week',1,5877.72,5877.72)`);
 expect("the next week bills fine", true);
+
+// Imported staff: invitations that aren't sent can't be used; details flow to the profile on accept
+const imp = (await as(U.owner, `insert into invitations (organisation_id,email,full_name,phone,employment_type,sent_at)
+  values ('${org}','other@b.com','Olive Other','0400 000 009','part_time',null) returning token`)).rows[0].token;
+expect("unsent invitation has no preview", (await as(U.other, `select count(*)::int n from invitation_preview('${imp}')`)).rows[0].n === 0);
+await throws("unsent invitation can't be accepted", () => as(U.other, `select public.accept_invitation('${imp}')`));
+await as(U.owner, `update invitations set sent_at = now() where token='${imp}'`);
+await as(U.other, `select public.accept_invitation('${imp}')`);
+const joined = (await as(U.owner, `select m.employment_type, p.full_name, p.phone from org_members m join profiles p on p.id=m.user_id where m.organisation_id='${org}' and m.user_id='${U.other}'`)).rows[0];
+expect("imported details copied on accept", joined?.employment_type === "part_time" && joined?.full_name === "Olive Other" && joined?.phone === "0400 000 009");
+await as(U.owner, `update participants set external_ref='C-1', management_type='plan_managed' where id='${p1}'`);
+await throws("external IDs are unique per organisation", () => as(U.owner, `update participants set external_ref='C-1' where id='${p2}'`));
 
 console.log(failures ? `\n${failures} FAILED` : "\nALL PASSED");
 process.exit(failures ? 1 : 0);

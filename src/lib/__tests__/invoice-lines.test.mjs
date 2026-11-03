@@ -12,7 +12,7 @@ const SELF_CARE = {
   travel_code: "01_799_0107_1_1",
 };
 const FORMAT = "{participant} @ {date} {start} - {end} [{service}] [{code}]";
-const opts = { tz: TZ, holidays: new Set(), participantName: "Ridge Kainz", lineFormat: FORMAT, kmRate: 1.02 };
+const opts = { tz: TZ, holidays: new Set(), participantName: "Riley Example", lineFormat: FORMAT, kmRate: 1.02 };
 const shift = (date, start, end, more = {}) => ({
   id: "s", starts_at: localToUtc(date, start, TZ), ends_at: localToUtc(date, end, TZ), break_minutes: 0,
   extra_minutes: 0, km: 0, support_item_code: null, charge_rate: null, service: SELF_CARE, ...more,
@@ -22,7 +22,7 @@ test("matches the sample invoice line (weekday 6–8pm)", () => {
   const { lines, problems } = linesForShift(shift("2026-10-19", "18:00", "20:00"), opts);
   assert.deepEqual(problems, []);
   assert.equal(lines.length, 1);
-  assert.equal(lines[0].description, "Ridge Kainz @ 19/10/2026 06:00 PM - 08:00 PM [01 Assistance With Self Care Activities Standard] [01_011_0107_1_1]");
+  assert.equal(lines[0].description, "Riley Example @ 19/10/2026 06:00 PM - 08:00 PM [01 Assistance With Self Care Activities Standard] [01_011_0107_1_1]");
   assert.equal(lines[0].quantity, 2); assert.equal(lines[0].unit_price, 73.58); assert.equal(lines[0].amount, 147.16);
 });
 test("weekday 3–9pm is an evening shift (01_015)", () => {

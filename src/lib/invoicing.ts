@@ -44,6 +44,7 @@ type ParticipantRow = {
   id: string; first_name: string; last_name: string; ndis_number: string | null; email: string | null; phone: string | null;
   address_line1: string | null; address_line2: string | null; suburb: string | null; state: string | null; postcode: string | null;
   support_coordinator_name: string | null; support_coordinator_email: string | null; invoice_emails: string | null;
+  management_type: string | null;
   ndis_plans: { start_date: string; end_date: string; status: string; management_type: string; plan_manager_name: string | null; plan_manager_email: string | null }[];
 };
 
@@ -56,7 +57,7 @@ function billTo(p: ParticipantRow, asOf: string): BillTo {
     address: [p.address_line1, p.address_line2, [p.suburb, p.state, p.postcode].filter(Boolean).join(" ")].filter((x): x is string => !!x),
     support_coordinator_name: p.support_coordinator_name, support_coordinator_email: p.support_coordinator_email,
     plan_manager_name: plan?.plan_manager_name ?? null, plan_manager_email: plan?.plan_manager_email ?? null,
-    management_type: plan?.management_type ?? null, invoice_emails: p.invoice_emails,
+    management_type: plan?.management_type ?? p.management_type ?? null, invoice_emails: p.invoice_emails,
   };
 }
 
@@ -90,7 +91,7 @@ export async function billableFor(
 
   const [{ data: people }, { data: shifts }, { data: holidays }, { data: overlaps }, { data: charges }] = await Promise.all([
     supabase.from("participants")
-      .select("id,first_name,last_name,ndis_number,email,phone,address_line1,address_line2,suburb,state,postcode,support_coordinator_name,support_coordinator_email,invoice_emails,ndis_plans(start_date,end_date,status,management_type,plan_manager_name,plan_manager_email)")
+      .select("id,first_name,last_name,ndis_number,email,phone,address_line1,address_line2,suburb,state,postcode,support_coordinator_name,support_coordinator_email,invoice_emails,management_type,ndis_plans(start_date,end_date,status,management_type,plan_manager_name,plan_manager_email)")
       .eq("organisation_id", org.id).in("id", participantIds),
     supabase.from("shifts")
       .select("id,participant_id,starts_at,ends_at,break_minutes,support_item_code,charge_rate,service:services(*),timesheet_adjustments(extra_minutes,status),travel_logs(kilometres,status)")

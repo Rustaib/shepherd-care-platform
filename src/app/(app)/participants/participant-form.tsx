@@ -62,6 +62,16 @@ export function ParticipantForm({ action, participant = {}, cancelHref }: {
           <p className="text-sm text-muted">Invoices are emailed to the support coordinator, plus the plan manager for plan-managed participants. You can change recipients each time you send.</p>
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
+          <div className="sm:col-span-2">
+            <label htmlFor="management_type" className="label">Funding managed by</label>
+            <select id="management_type" name="management_type" className="field" defaultValue={v("management_type")}>
+              <option value="">— Not set —</option>
+              <option value="ndia_managed">NDIA (agency) managed</option>
+              <option value="plan_managed">Plan managed</option>
+              <option value="self_managed">Self managed</option>
+            </select>
+            <p className="mt-1 text-xs text-muted">Used when no NDIS plan has been entered; a current plan&apos;s setting takes priority.</p>
+          </div>
           <Field label="Support coordinator" name="support_coordinator_name" defaultValue={v("support_coordinator_name")} />
           <Field label="Support coordinator email" name="support_coordinator_email" type="email" defaultValue={v("support_coordinator_email")} error={e.support_coordinator_email} />
           <Field label="Other invoice emails" name="invoice_emails" defaultValue={v("invoice_emails")} error={e.invoice_emails} className="sm:col-span-2"

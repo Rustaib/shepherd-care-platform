@@ -1,8 +1,8 @@
-# Care Platform (Shepherd Care)
+# Hoiva — care management platform
 
 A multi-tenant, white-label platform for NDIS providers: participants, plans and
 budgets, rostering, progress and incident notes, expenses and travel, timesheets,
-approvals and SCHADS-aligned payroll exports. Shepherd Care is the first tenant;
+approvals and SCHADS-aligned payroll exports. The first customer runs on it in-house;
 other providers can sign up with their own logo and colours.
 
 **Stack:** Next.js 15 (App Router) on Cloudflare Workers via OpenNext ·
@@ -75,13 +75,13 @@ A detailed step-by-step version of this checklist is kept in the project's Go-Li
    `customer.subscription.*` (`STRIPE_WEBHOOK_SECRET`), and enable the customer portal.
    Without Stripe keys, billing is off and nobody is limited.
 7. **Your own organisation** — sign up at `/signup`, then exempt it from billing in
-   the Supabase SQL editor: `update organisations set billing_exempt = true where slug like 'shepherd%';`
-8. Connect `portal.shepherdcare.com.au` in Settings → Custom domain and add the
+   the Supabase SQL editor: `update organisations set billing_exempt = true where slug = '<your-org-slug>';`
+8. Connect `portal.yourcompany.com.au` in Settings → Custom domain and add the
    Squarespace redirect for `/portal`.
 
 ## Customer domains (white-label)
 
-Each organisation can connect one hostname, e.g. `portal.shepherdcare.com.au`,
+Each organisation can connect one hostname, e.g. `portal.yourcompany.com.au`,
 from **Settings → Custom domain**. Their login page, installed app name and
 colours, and invitation links then use their own domain.
 
@@ -97,9 +97,9 @@ One-time platform setup in the Cloudflare dashboard (zone of the platform domain
 4. Create an API token with *SSL and Certificates: Edit* on the zone and set
    `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ZONE_ID`, `CUSTOM_DOMAIN_CNAME_TARGET`.
 
-A path on a customer's main website (e.g. `shepherdcare.com.au/portal`) is
+A path on a customer's main website (e.g. `yourcompany.com.au/portal`) is
 handled with a redirect from their website builder — in Squarespace:
-Settings → Developer Tools → URL Mappings → `/portal -> https://portal.shepherdcare.com.au 301`.
+Settings → Developer Tools → URL Mappings → `/portal -> https://portal.yourcompany.com.au 301`.
 Serving the portal *under* a path would require the customer's whole domain to
 be proxied through Cloudflare, so it isn't the default.
 
